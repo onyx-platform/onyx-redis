@@ -28,8 +28,7 @@
 
 (defmethod p-ext/read-batch :redis/read-from-set
   [{:keys [onyx.core/task-map redis/conn redis/keystore redis/pending-messages]}]
-  (let [task-map {:onyx/batch-size 500 :onyx/max-pending 10000 :onyx/batch-timeout 1000}
-        pending (count @pending-messages)
+  (let [pending (count @pending-messages)
         max-pending (arg-or-default :onyx/max-pending task-map)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
