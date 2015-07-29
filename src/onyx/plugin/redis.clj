@@ -32,7 +32,6 @@
         batch-end-time (+ ms (System/currentTimeMillis))
         batch (if (pos? max-segments)
                 (loop [segments [] cnt 0]
-
                   (if (or (= cnt max-segments)
                           (neg? (- batch-end-time (System/currentTimeMillis))))
                     segments

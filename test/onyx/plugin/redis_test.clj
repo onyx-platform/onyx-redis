@@ -59,7 +59,7 @@
     :redis/keystore ::keystore
     :onyx/batch-size batch-size
     :onyx/max-peers 1
-    :onyx/doc "Reads segments via durable-queue"}
+    :onyx/doc "Reads segments via redis"}
 
    {:onyx/name :inc
     :onyx/fn ::my-inc
@@ -71,7 +71,7 @@
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/doc "Writes segments via durable-queue"}])
+    :onyx/doc ""}])
 
 (def workflow
   [[:in :inc]
