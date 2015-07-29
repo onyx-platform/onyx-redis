@@ -47,7 +47,6 @@
 ;;;;;
 ;;;;;
 (defn my-inc [{:keys [n] :as segment}]
-  (println segment)
   (update-in segment [:hello] str))
 
 (def catalog
@@ -77,7 +76,7 @@
   [[:in :inc]
    [:inc :out]])
 
-(def out-chan (async/chan 10))
+(def out-chan (async/chan 1024))
 
 (defn inject-writer-ch [event lifecycle]
   {:core.async/chan out-chan})
@@ -114,3 +113,7 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
+
+;(wcar redis-conn (car/llen ::keystore))
+
+;(count (take-segments! out-chan))
