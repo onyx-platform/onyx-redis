@@ -38,13 +38,17 @@
                     segments
                     (let [key (wcar conn (car/rpoplpush keystore keystore))
                           message (wcar conn (car/smembers key))]
-                      (if message
+                      (if (and (not (empty? message))
+                               (not (nil? key)))
                         (recur (conj segments
                                      {:id key
                                       :input :redis
                                       :message message})
                                (inc cnt))
-                        segments)))))]
+                        (conj segments
+                              {:id :done
+                               :input :redis
+                               :message :done}))))))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
