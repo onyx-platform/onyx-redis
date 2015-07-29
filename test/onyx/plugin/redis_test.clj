@@ -1,10 +1,11 @@
 (ns onyx.plugin.redis-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.plugin.redis]
+            [onyx.plugin.core-async :refer [take-segments!]]
             [midje.sweet :refer :all]
             [taoensso.carmine :as car :refer [wcar]]
+            [clojure.core.async :as async]
             [onyx.api]))
-
 
 (def id (java.util.UUID/randomUUID))
 
@@ -25,50 +26,50 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 1000)
+(def n-messages 100)
 
 (def batch-size 20)
 
-(def input-queue-name (str "input_queue_" (Math/abs (hash (java.util.UUID/randomUUID)))))
+(def redis-conn {:pool {} :spec {:host "192.168.99.100"}})
 
-(def output-queue-name (str "output_queue_" (Math/abs (hash (java.util.UUID/randomUUID)))))
 
-(def dir "/tmp")
-
-(def conn (d/queues dir {}))
-
+;;;;; Load up the redis with test data
+;;;;;
+;;;;;
 (doseq [n (range n-messages)]
-  (d/put! conn input-queue-name {:n n}))
+  (let [message {::key (Math/abs (hash n))
+                 :hello :world}]
+    (wcar redis-conn
+          (car/sadd (::key message) message)
+          (car/lpush ::keystore (::key message)))))
 
-(d/put! conn input-queue-name :done)
-
+;;;;;
+;;;;;
+;;;;;
 (defn my-inc [{:keys [n] :as segment}]
-  (assoc segment :n (inc n)))
+  (println segment)
+  (update-in segment [:hello] str))
 
 (def catalog
   [{:onyx/name :in
-    :onyx/ident :durable-queue/read-from-queue
+    :onyx/ident :redis/read-from-set
     :onyx/type :input
-    :onyx/medium :durable-queue
-    :durable-queue/queue-name input-queue-name
-    :durable-queue/directory dir
-    :durable-queue/fsync-take? true
+    :onyx/medium :redis
+    :redis/connection redis-conn
+    :redis/keystore ::keystore
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments via durable-queue"}
 
    {:onyx/name :inc
-    :onyx/fn :onyx.plugin.durable-queue-test/my-inc
+    :onyx/fn ::my-inc
     :onyx/type :function
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
-    :onyx/ident :durable-queue/write-to-queue
+    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
-    :onyx/medium :durable-queue
-    :durable-queue/queue-name output-queue-name
-    :durable-queue/directory dir
-    :durable-queue/fsync-put? true
+    :onyx/medium :core.async
     :onyx/batch-size batch-size
     :onyx/doc "Writes segments via durable-queue"}])
 
@@ -76,13 +77,23 @@
   [[:in :inc]
    [:inc :out]])
 
+(def out-chan (async/chan 10))
+
+(defn inject-writer-ch [event lifecycle]
+  {:core.async/chan out-chan})
+
+(def out-lifecycle
+  {:lifecycle/before-task-start inject-writer-ch})
+
 (def lifecycles
   [{:lifecycle/task :in
-    :lifecycle/calls :onyx.plugin.durable-queue/reader-state-calls}
-   {:lifecycle/task :in
-    :lifecycle/calls :onyx.plugin.durable-queue/reader-connection-calls}
+    :lifecycle/calls :onyx.plugin.redis/reader-state-calls}
+
    {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.durable-queue/writer-calls}])
+    :lifecycle/calls ::out-lifecycle}
+
+   {:lifecycle/task :out
+    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
@@ -96,22 +107,6 @@
      :task-scheduler :onyx.task-scheduler/balanced})))
 
 (onyx.api/await-job-completion peer-config job-id)
-
-(def results
-  (loop [rets []]
-    (let [x (d/take! (d/queues dir {}) output-queue-name 1000 nil)]
-      (when x
-        (d/complete! x))
-      (cond (nil? x)
-            rets
-            (= @x :done)
-            (conj rets @x)
-            :else
-            (recur (conj rets @x))))))
-
-(let [expected (set (map (fn [x] {:n (inc x)}) (range n-messages)))]
-  (fact (set (butlast results)) => expected)
-  (fact (last results) => :done))
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))

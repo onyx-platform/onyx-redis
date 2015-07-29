@@ -6,4 +6,5 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.onyxplatform/onyx "0.6.0"]
                  [com.taoensso/carmine "2.11.1"]
-                 [midje "1.7.0"] ])
+                 [midje "1.7.0"]
+                 [com.taoensso/timbre "3.4.0"]])

@@ -4,10 +4,6 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [clojure.core.async :refer [<!! timeout close! go <! take!]]))
 
-(def server1-conn {:pool {} :spec {:host "192.168.99.100"}})
-(defmacro wcar* [& body]
-  `(car/wcar server1-conn ~@body))
-
 (defn get-next-item [conn key-set]
   (when-let [key (wcar conn (car/lrange key-set 0 1))]
     {key (wcar conn (car/smembers key))}))
@@ -63,7 +59,7 @@
   (comment "Dont need this"))
 
 (defmethod p-ext/pending? :redis/read-from-set
-  [{:keys []} message-id]
+  [{:keys [redis/pending-messages]} message-id]
   (get @pending-messages message-id))
 
 (defmethod p-ext/drained? :redis/read-from-set
