@@ -43,7 +43,7 @@
                         (recur (conj segments
                                      {:id key
                                       :input :redis
-                                      :message message})
+                                      :message {key message}})
                                (inc cnt))
                         (conj segments
                               {:id :done

@@ -98,8 +98,9 @@
 (def retry? (atom true))
 
 (defn retry-once [_ segment _ _]
-  (let [match (Math/abs (hash 40))]
-    (if (= (::key segment) match)
+  (let [match (Math/abs (hash 40))
+        seg (first (flatten (vals segment)))]
+    (if (= (::key seg) match)
       (if @retry?
         (do (swap! retry? not)
             true)
