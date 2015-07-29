@@ -5,4 +5,5 @@
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.onyxplatform/onyx "0.6.0"]
-                 [com.taoensso/carmine "2.11.1"]])
+                 [com.taoensso/carmine "2.11.1"]
+                 [midje "1.7.0"] ])

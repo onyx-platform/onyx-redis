@@ -71,3 +71,6 @@
   [{:keys [redis/conn redis/keystore redis/pending-messages]}]
   (and (= (count @pending-messages) 1)
        (zero? (wcar conn (car/llen keystore)))))
+
+(def reader-state-calls
+  {:lifecycle/before-task-start inject-pending-state})
