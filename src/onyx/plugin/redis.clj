@@ -60,7 +60,8 @@
 (defmethod p-ext/retry-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
   (let [msg (get @pending-messages message-id)]
-    (wcar conn (car/lpush keystore message-id))))
+    (when (not= msg :done)
+      (wcar conn (car/lpush keystore message-id)))))
 
 (defmethod p-ext/pending? :redis/read-from-set
   [{:keys [redis/pending-messages]} message-id]

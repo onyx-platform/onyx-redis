@@ -26,7 +26,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 1000)
+(def n-messages 100)
 
 (def batch-size 20)
 
@@ -95,6 +95,30 @@
    {:lifecycle/task :out
     :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
 
+(def retry? (atom true))
+
+(defn retry-once [_ segment _ _]
+  (let [match (Math/abs (hash 40))]
+    (if (= (::key segment) match)
+      (if @retry?
+        (do (swap! retry? not)
+            true)
+        false)
+      false)))
+
+(def constantly-true (constantly true))
+
+(def flow
+  [{:flow/from :inc
+    :flow/to :none
+    :flow/short-circuit? true
+    :flow/predicate ::retry-once
+    :flow/action :retry}
+
+   {:flow/from :inc
+    :flow/to [:out]
+    :flow/predicate ::constantly-true}])
+
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
 (def job-id
@@ -104,6 +128,7 @@
     {:catalog catalog
      :workflow workflow
      :lifecycles lifecycles
+     :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
 
 
@@ -117,6 +142,10 @@
 (onyx.api/shutdown-peer-group peer-group)
 
 (onyx.api/shutdown-env env)
+
+(fact (count r) => 101)
+(fact (last r) => :done)
+(fact @retry? => false)
 
 (wcar redis-conn
       (car/flushall))
