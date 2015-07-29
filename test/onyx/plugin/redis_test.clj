@@ -26,7 +26,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 100)
+(def n-messages 1000)
 
 (def batch-size 20)
 
@@ -47,7 +47,8 @@
 ;;;;;
 ;;;;;
 (defn my-inc [{:keys [n] :as segment}]
-  (update-in segment [:hello] str))
+  (update-in segment [:hello] (fn [x]
+                                (str x))))
 
 (def catalog
   [{:onyx/name :in
@@ -105,6 +106,9 @@
      :lifecycles lifecycles
      :task-scheduler :onyx.task-scheduler/balanced})))
 
+
+(def r (take-segments! out-chan))
+
 (onyx.api/await-job-completion peer-config job-id)
 
 (doseq [v-peer v-peers]
@@ -114,6 +118,5 @@
 
 (onyx.api/shutdown-env env)
 
-;(wcar redis-conn (car/llen ::keystore))
-
-;(count (take-segments! out-chan))
+(wcar redis-conn
+      (car/flushall))

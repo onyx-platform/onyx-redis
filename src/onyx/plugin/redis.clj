@@ -36,7 +36,7 @@
                   (if (or (= cnt max-segments)
                           (neg? (- batch-end-time (System/currentTimeMillis))))
                     segments
-                    (let [key (wcar conn (car/rpoplpush keystore keystore))
+                    (let [key (wcar conn (car/lpop keystore))
                           message (wcar conn (car/smembers key))]
                       (if (and (not (empty? message))
                                (not (nil? key)))
@@ -55,12 +55,12 @@
 
 (defmethod p-ext/ack-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (wcar conn (car/lrem keystore 0 message-id))
   (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/retry-message :redis/read-from-set
-  [{:keys [redis/conn]} message-id]
-  (comment "Dont need this"))
+  [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
+  (let [msg (get @pending-messages message-id)]
+    (wcar conn (car/lpush keystore message-id))))
 
 (defmethod p-ext/pending? :redis/read-from-set
   [{:keys [redis/pending-messages]} message-id]
