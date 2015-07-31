@@ -46,6 +46,7 @@ Lifecycle entry:
 |------------------------------|-----------|------------
 |`:redis/conn`                 | `map`     | This is a [Carmine](https://github.com/ptaoussanis/carmine) connection map of the form `{:pool {<opts>} :spec {<opts>}}`
 |`:redis/keystore`             |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) containing each the keys of each set the plugin is concerned with
+|`:redis/step-size`            |`int`      | The step granularity to batch requests to Redis. defaults to 10
 
 #### Contributing
 
