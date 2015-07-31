@@ -2,11 +2,57 @@
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [taoensso.carmine :as car :refer (wcar)]
             [onyx.static.default-vals :refer [arg-or-default]]
-            [clojure.core.async :refer [<!! timeout close! go <! take!]]))
+            [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
+                                        >!! >! <!! <! chan] :as async]))
 
-(defn get-next-item [conn key-set]
-  (when-let [key (wcar conn (car/lrange key-set 0 1))]
-    {key (wcar conn (car/smembers key))}))
+(defn batch-load-keys
+  ([conn keystore]
+   (batch-load-keys conn keystore 100))
+  ([conn keystore step]
+   (when-let [[keys _] (wcar conn
+                             (car/lrange keystore 0 (dec step))
+                             (car/ltrim keystore step -1))]
+     keys)))
+
+(batch-load-keys aaa "clarity.functions.denver-health/keystore")
+
+(defn batch-load-records [conn keys]
+  "Starts loading records"
+  (wcar conn (mapv (fn [key]
+                     (car/parse (partial assoc {} key) (car/smembers key))) keys)))
+
+
+(defn take-from-redis [conn keystore batch-size steps timeout]
+  "      conn: Carmine map for connecting to redis
+     keystore: The name of a redis list for looking up the relevant sets/vals
+   batch-size: The maximum size of a returned batch
+        steps: granularity of each step
+      timeout: stop processing new collections after `timeout`/ms''
+
+  In order to stay consistent in Redis list consumption, this function will
+  finish processing the batch it's currently on before returning. This means that
+  if your batch sizes are large and steps are small, it is possible to block for
+  and extended ammount of time. Returns nil if the list is exausted."
+  (let [end (+ timeout (System/currentTimeMillis))
+        step-size (int (Math/floor (/ batch-size steps)))
+        return (atom [])]
+    (loop [step steps
+           end? (- end (System/currentTimeMillis))]
+      (if (and (pos? end?)
+               (pos? step))
+        (do (let [keys (batch-load-keys conn keystore step-size)
+                  records (batch-load-records conn keys)]
+              (swap! return into records))
+            (recur (dec step)
+                   (- end (System/currentTimeMillis))))
+        @return))))
+
+;(def res (take-from-redis aaa "clarity.functions.denver-health/keystore" 10000 10 1000))
+
+(defn get-key-list [conn keystore]
+  "Returns the entire list of keystore elements"
+  (wcar conn
+        (car/lrange keystore 0 -1)))
 
 (defn build-key-queue! [conn key-queue keystore]
   "Takes a conn and keystore key, returns a queue built up from it's constituents"
@@ -17,9 +63,11 @@
     key-queue))
 
 (defn inject-pending-state [event lifecycle]
-  (let [task (:onyx.core/task-map event)]
-    {:redis/conn (:redis/connection task)
-     :redis/keystore (:redis/keystore task)
+  (let [task     (:onyx.core/task-map event)
+        conn     (:redis/connection task)
+        keystore (:redis/keystore task)]
+    {:redis/conn             conn
+     :redis/keystore         keystore
      :redis/pending-messages (atom {})}))
 
 (defmethod p-ext/read-batch :redis/read-from-set
@@ -73,3 +121,5 @@
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
+
+(def aaa {:pool {} :spec {:host "192.168.99.100"}})

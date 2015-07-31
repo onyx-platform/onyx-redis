@@ -1,10 +1,11 @@
 (ns onyx.plugin.redis-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.plugin.redis]
+            [onyx.plugin.redis :refer :all]
+            [clojure.core.async :refer [chan]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [midje.sweet :refer :all]
             [taoensso.carmine :as car :refer [wcar]]
-            [clojure.core.async :as async]
+            [clojure.core.async :as async :refer [chan <!! >!!]]
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
@@ -148,5 +149,17 @@
 (fact (last r) => :done)
 (fact @retry? => false)
 
+(let [ochan (chan)
+      _ (wcar redis-conn
+              (mapv (partial car/lpush :testtest)
+                    (reverse (clojure.string/split
+                              "hello from earth!" #" "))))
+      _ (batch-load-keys ochan redis-conn :testtest)]
+  (let [[h f e] (<!! ochan)]
+    (fact h => "hello")
+    (fact f => "from")
+    (fact e => "earth!")))
+
 (wcar redis-conn
-      (car/flushall))
+      (car/flushall)
+      (car/flushdb))

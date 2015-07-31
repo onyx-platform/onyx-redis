@@ -6,5 +6,6 @@
   :dependencies [[org.clojure/clojure "1.6.0"]
                  [org.onyxplatform/onyx "0.6.0"]
                  [com.taoensso/carmine "2.11.1"]
+                 [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [midje "1.7.0"]
                  [com.taoensso/timbre "3.4.0"]])
