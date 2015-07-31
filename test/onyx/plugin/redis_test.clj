@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 100)
+(def n-messages 108)
 
 (def batch-size 10)
 
@@ -58,6 +58,7 @@
     :onyx/medium :redis
     :redis/connection redis-conn
     :redis/keystore ::keystore
+    :redis/step-size 10
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments via redis"}
@@ -78,7 +79,7 @@
   [[:in :inc]
    [:inc :out]])
 
-(def out-chan (async/chan 1024))
+(def out-chan (async/chan 1))
 
 (defn inject-writer-ch [event lifecycle]
   {:core.async/chan out-chan})
@@ -99,7 +100,7 @@
 (def retry? (atom true))
 
 (defn retry-once [_ segment _ _]
-  (let [match (Math/abs (hash 10))
+  (let [match (Math/abs (hash -10))
         seg (first (flatten (vals segment)))]
     (if (= (::key seg) match)
       (if @retry?
@@ -163,3 +164,8 @@
 (wcar redis-conn
       (car/flushall)
       (car/flushdb))
+
+;(take-from-redis redis-conn ::keystore 100 1 1000)
+                                        ;(+ 11 1)
+
+;(frequencies (map type r))

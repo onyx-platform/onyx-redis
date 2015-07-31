@@ -43,7 +43,7 @@
             (recur (dec step)
                    (- end (System/currentTimeMillis))))
         (do (swap! return flatten)
-            @return)))))
+            ()@return)))))
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
@@ -64,18 +64,20 @@
         max-segments (min (- max-pending pending) batch-size)
         ms (arg-or-default :onyx/batch-timeout task-map)
         batch (if (pos? max-segments)
-                (when-let [records (take-from-redis conn keystore batch-size (or step-size 10) ms)]
-                  (if (not (empty? (filter identity records)))
-                    (map (fn [record] {:id (java.util.UUID/randomUUID)
-                                       :input :redis
-                                       :message record}) records)
-                    [{:id (java.util.UUID/randomUUID)
-                      :input :redis
-                      :message :done}])))]
+                (when-let [records (take-from-redis conn keystore batch-size (or step-size 1) ms)]
+                  (mapv (fn [record]
+                          (if record
+                            {:id (java.util.UUID/randomUUID)
+                             :input :redis
+                             :message record}
+                            {:id (java.util.UUID/randomUUID)
+                             :input :redis
+                             :message :done}))
+                        records)))]
     (doseq [m batch]
-      (when (and (= (:message (first batch)) :done)
-                 (= (count batch) 1)
+      (when (and (= (:message m) :done)
                  (= 0 (wcar conn (car/llen keystore))))
+
         (reset! drained? true))
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
