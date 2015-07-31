@@ -57,14 +57,14 @@
 
 (defmethod p-ext/read-batch :redis/read-from-set
   [{:keys [onyx.core/task-map redis/conn redis/keystore
-           redis/pending-messages redis/drained?]}]
+           redis/pending-messages redis/drained? redis/step-size]}]
   (let [pending (count @pending-messages)
         max-pending (arg-or-default :onyx/max-pending task-map)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
         ms (arg-or-default :onyx/batch-timeout task-map)
         batch (if (pos? max-segments)
-                (when-let [records (take-from-redis conn keystore batch-size 10 ms)]
+                (when-let [records (take-from-redis conn keystore batch-size (or step-size 10) ms)]
                   (if (not (empty? (filter identity records)))
                     (map (fn [record] {:id (java.util.UUID/randomUUID)
                                        :input :redis
@@ -101,5 +101,3 @@
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
-
-;(take-from-redis {:pool {} :spec {:host "192.168.99.100"}} :onyx.plugin.redis-test/keystore 10 1 1000)
