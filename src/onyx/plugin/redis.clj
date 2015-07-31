@@ -90,8 +90,8 @@
 (defmethod p-ext/retry-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
   (when-let [message (get @pending-messages message-id)]
-    (wcar conn
-          (car/rpush keystore (first (keys message))))))
+    (swap! pending-messages dissoc message-id)
+    (wcar conn (car/rpush keystore (first (keys message))))))
 
 (defmethod p-ext/pending? :redis/read-from-set
   [{:keys [redis/pending-messages]} message-id]
@@ -99,7 +99,8 @@
 
 (defmethod p-ext/drained? :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages redis/drained?]}]
-  @drained?)
+  (and (= 1 (count @pending-messages))
+       (deref drained?)))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})

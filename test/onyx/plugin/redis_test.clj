@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 19)
+(def n-messages 18)
 
 (def batch-size 10)
 
@@ -50,8 +50,7 @@
 (def cn (atom 0))
 (defn my-inc [{:keys [n] :as segment}]
   (swap! cn inc)
-  (update-in segment [:hello] (fn [x]
-                                (str x))))
+  segment)
 
 (def catalog
   [{:onyx/name :in
@@ -60,7 +59,7 @@
     :onyx/medium :redis
     :redis/connection redis-conn
     :redis/keystore ::keystore
-    :redis/step-size 10
+    :redis/step-size 1
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments via redis"}
