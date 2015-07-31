@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 108)
+(def n-messages 19)
 
 (def batch-size 10)
 
@@ -165,7 +165,6 @@
       (car/flushall)
       (car/flushdb))
 
-;(take-from-redis redis-conn ::keystore 100 1 1000)
+                                        ;(take-from-redis redis-conn ::keystore 100 1 1000)
                                         ;(+ 11 1)
-
-;(frequencies (map type r))
+                                        ;(frequencies (map type r))
