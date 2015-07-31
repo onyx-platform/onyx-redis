@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 50)
+(def n-messages 100)
 
 (def batch-size 10)
 
@@ -50,10 +50,6 @@
 (defn my-inc [{:keys [n] :as segment}]
   (update-in segment [:hello] (fn [x]
                                 (str x))))
-
-(take-from-redis {:pool {} :spec {:host "192.168.99.100"}} ::keystore 10 10 1000)
-
-;(batch-load-records {:pool {} :spec {:host "192.168.99.100"}} ["2108889467"])
 
 (def catalog
   [{:onyx/name :in
@@ -103,7 +99,7 @@
 (def retry? (atom true))
 
 (defn retry-once [_ segment _ _]
-  (let [match (Math/abs (hash -1))
+  (let [match (Math/abs (hash 10))
         seg (first (flatten (vals segment)))]
     (if (= (::key seg) match)
       (if @retry?
@@ -158,8 +154,8 @@
               (mapv (partial car/lpush :testtest)
                     (reverse (clojure.string/split
                               "hello from earth!" #" "))))
-      _ (batch-load-keys ochan redis-conn :testtest)]
-  (let [[h f e] (<!! ochan)]
+      res (batch-load-keys redis-conn :testtest 3)]
+  (let [[h f e] res]
     (fact h => "hello")
     (fact f => "from")
     (fact e => "earth!")))

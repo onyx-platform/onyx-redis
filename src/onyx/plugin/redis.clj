@@ -19,7 +19,6 @@
   (wcar conn (mapv (fn [key]
                      (car/parse (partial assoc {} key) (car/smembers key))) keys)))
 
-
 (defn take-from-redis [conn keystore batch-size steps timeout]
   "      conn: Carmine map for connecting to redis
      keystore: The name of a redis list for looking up the relevant sets/vals
@@ -43,56 +42,64 @@
               (swap! return conj records))
             (recur (dec step)
                    (- end (System/currentTimeMillis))))
-        @return))))
+        (do (swap! return flatten)
+            @return)))))
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
         conn     (:redis/connection task)
-        keystore (:redis/keystore task)]
+        keystore (:redis/keystore task)
+        drained? (atom false)]
     {:redis/conn             conn
      :redis/keystore         keystore
+     :redis/drained?         drained?
      :redis/pending-messages (atom {})}))
 
 (defmethod p-ext/read-batch :redis/read-from-set
-  [{:keys [onyx.core/task-map redis/conn redis/keystore redis/pending-messages]}]
+  [{:keys [onyx.core/task-map redis/conn redis/keystore
+           redis/pending-messages redis/drained?]}]
   (let [pending (count @pending-messages)
         max-pending (arg-or-default :onyx/max-pending task-map)
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
         ms (arg-or-default :onyx/batch-timeout task-map)
         batch (if (pos? max-segments)
-                (when-let [records (take-from-redis conn keystore batch-size 4 ms)]
-                  (if (not (empty (filter identity records)))
+                (when-let [records (take-from-redis conn keystore batch-size 10 ms)]
+                  (if (not (empty? (filter identity records)))
                     (map (fn [record] {:id (java.util.UUID/randomUUID)
                                        :input :redis
-                                       :message record})
-                         records)
-                    {:id (java.util.UUID/randomUUID)
-                     :input :redis
-                     :message :done})))]
+                                       :message record}) records)
+                    [{:id (java.util.UUID/randomUUID)
+                      :input :redis
+                      :message :done}])))]
     (doseq [m batch]
+      (when (and (= (:message (first batch)) :done)
+                 (= (count batch) 1)
+                 (= 0 (wcar conn (car/llen keystore))))
+        (reset! drained? true))
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
-
 (defmethod p-ext/ack-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (swap! pending-messages dissoc message-id))
+  (when-let [message (get @pending-messages message-id)]
+    (swap! pending-messages dissoc message-id)))
 
 (defmethod p-ext/retry-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (let [msg (get @pending-messages message-id)]
-    (when (not= msg :done)
-      (wcar conn (car/lpush keystore message-id)))))
+  (when-let [message (get @pending-messages message-id)]
+    (wcar conn
+          (car/rpush keystore (first (keys message))))))
 
 (defmethod p-ext/pending? :redis/read-from-set
   [{:keys [redis/pending-messages]} message-id]
   (get @pending-messages message-id))
 
 (defmethod p-ext/drained? :redis/read-from-set
-  [{:keys [redis/conn redis/keystore redis/pending-messages]}]
-  (and (= (count @pending-messages) 1)
-       (zero? (wcar conn (car/llen keystore)))))
+  [{:keys [redis/conn redis/keystore redis/pending-messages redis/drained?]}]
+  @drained?)
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
+
+;(take-from-redis {:pool {} :spec {:host "192.168.99.100"}} :onyx.plugin.redis-test/keystore 10 1 1000)
