@@ -47,7 +47,9 @@
 ;;;;;
 ;;;;;
 ;;;;;
+(def cn (atom 0))
 (defn my-inc [{:keys [n] :as segment}]
+  (swap! cn inc)
   (update-in segment [:hello] (fn [x]
                                 (str x))))
 
@@ -79,7 +81,7 @@
   [[:in :inc]
    [:inc :out]])
 
-(def out-chan (async/chan 1))
+(def out-chan (async/chan 10))
 
 (defn inject-writer-ch [event lifecycle]
   {:core.async/chan out-chan})
@@ -100,7 +102,7 @@
 (def retry? (atom true))
 
 (defn retry-once [_ segment _ _]
-  (let [match (Math/abs (hash -10))
+  (let [match (Math/abs (hash 10))
         seg (first (flatten (vals segment)))]
     (if (= (::key seg) match)
       (if @retry?
@@ -131,7 +133,7 @@
     {:catalog catalog
      :workflow workflow
      :lifecycles lifecycles
-     :flow-conditions flow
+ ;    :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
 
 
@@ -146,7 +148,7 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (count r) => 101)
+(fact (count r) => 20)
 (fact (last r) => :done)
 (fact @retry? => false)
 
@@ -164,7 +166,9 @@
 (wcar redis-conn
       (car/flushall)
       (car/flushdb))
-
-                                        ;(take-from-redis redis-conn ::keystore 100 1 1000)
                                         ;(+ 11 1)
                                         ;(frequencies (map type r))
+
+;(take-from-redis redis-conn ::keystore 1100 1 1000)
+
+;(println @cn)

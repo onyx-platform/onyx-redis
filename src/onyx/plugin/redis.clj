@@ -42,17 +42,16 @@
               (swap! return conj records))
             (recur (dec step)
                    (- end (System/currentTimeMillis))))
-        (do (swap! return flatten)
-            ()@return)))))
+        (do (swap! return (partial reduce into []))
+            @return)))))
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
         conn     (:redis/connection task)
-        keystore (:redis/keystore task)
-        drained? (atom false)]
+        keystore (:redis/keystore task)]
     {:redis/conn             conn
      :redis/keystore         keystore
-     :redis/drained?         drained?
+     :redis/drained?         (atom false)
      :redis/pending-messages (atom {})}))
 
 (defmethod p-ext/read-batch :redis/read-from-set
@@ -64,20 +63,21 @@
         max-segments (min (- max-pending pending) batch-size)
         ms (arg-or-default :onyx/batch-timeout task-map)
         batch (if (pos? max-segments)
-                (when-let [records (take-from-redis conn keystore max-segments (or step-size 1) ms)]
-                  (mapv (fn [record]
-                          (if record
+                (when-let [records (take-from-redis conn keystore max-segments
+                                                    (or step-size 1) ms)]
+                  (if (not (empty? records))
+                    (mapv (fn [record]
                             {:id (java.util.UUID/randomUUID)
                              :input :redis
-                             :message record}
-                            {:id (java.util.UUID/randomUUID)
-                             :input :redis
-                             :message :done}))
-                        records)))]
+                             :message record})
+                          records)
+                    [{:id (java.util.UUID/randomUUID)
+                      :input :redis
+                      :message :done}])))]
     (doseq [m batch]
-      (when (and (= (:message m) :done)
-                 (= 0 (wcar conn (car/llen keystore))))
-
+      (when (and
+             (= (wcar conn (car/llen keystore)) 0)
+             (= (:message m) :done))
         (reset! drained? true))
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
