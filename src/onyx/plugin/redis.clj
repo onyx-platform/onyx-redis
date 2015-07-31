@@ -14,8 +14,6 @@
                              (car/ltrim keystore step -1))]
      keys)))
 
-(batch-load-keys aaa "clarity.functions.denver-health/keystore")
-
 (defn batch-load-records [conn keys]
   "Starts loading records"
   (wcar conn (mapv (fn [key]
@@ -42,25 +40,10 @@
                (pos? step))
         (do (let [keys (batch-load-keys conn keystore step-size)
                   records (batch-load-records conn keys)]
-              (swap! return into records))
+              (swap! return conj records))
             (recur (dec step)
                    (- end (System/currentTimeMillis))))
         @return))))
-
-;(def res (take-from-redis aaa "clarity.functions.denver-health/keystore" 10000 10 1000))
-
-(defn get-key-list [conn keystore]
-  "Returns the entire list of keystore elements"
-  (wcar conn
-        (car/lrange keystore 0 -1)))
-
-(defn build-key-queue! [conn key-queue keystore]
-  "Takes a conn and keystore key, returns a queue built up from it's constituents"
-  (let [keys (wcar conn (car/smembers keystore))
-        key-queue (str key-queue)]
-    (doseq [k keys]
-      (wcar conn (car/lpush key-queue k)))
-    key-queue))
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
@@ -77,28 +60,20 @@
         batch-size (:onyx/batch-size task-map)
         max-segments (min (- max-pending pending) batch-size)
         ms (arg-or-default :onyx/batch-timeout task-map)
-        batch-end-time (+ ms (System/currentTimeMillis))
         batch (if (pos? max-segments)
-                (loop [segments [] cnt 0]
-                  (if (or (= cnt max-segments)
-                          (neg? (- batch-end-time (System/currentTimeMillis))))
-                    segments
-                    (let [key (wcar conn (car/lpop keystore))
-                          message (wcar conn (car/smembers key))]
-                      (if (and (not (empty? message))
-                               (not (nil? key)))
-                        (recur (conj segments
-                                     {:id key
-                                      :input :redis
-                                      :message {key message}})
-                               (inc cnt))
-                        (conj segments
-                              {:id :done
-                               :input :redis
-                               :message :done}))))))]
+                (when-let [records (take-from-redis conn keystore batch-size 4 ms)]
+                  (if (not (empty (filter identity records)))
+                    (map (fn [record] {:id (java.util.UUID/randomUUID)
+                                       :input :redis
+                                       :message record})
+                         records)
+                    {:id (java.util.UUID/randomUUID)
+                     :input :redis
+                     :message :done})))]
     (doseq [m batch]
       (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
+
 
 (defmethod p-ext/ack-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
@@ -121,5 +96,3 @@
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
-
-(def aaa {:pool {} :spec {:host "192.168.99.100"}})
