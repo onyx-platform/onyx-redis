@@ -1,9 +1,3 @@
-target/
+/target
 onyx.log
 .nrepl-port
-target/classes/META-INF/maven/onyx-redis/onyx-redis/pom.properties
-target/repl-port
-target/stale/extract-native.dependencies
-target/classes/META-INF/maven/onyx-redis/onyx-redis/pom.properties
-target/repl-port
-target/stale/extract-native.dependencies
