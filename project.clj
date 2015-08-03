@@ -1,4 +1,4 @@
-(defproject onyx-redis "0.6.0-4"
+(defproject onyx-redis "0.6.0-5"
   :description "Onyx plugin for redis"
   :url "FIX ME"
   :license {:name "Eclipse Public License"
