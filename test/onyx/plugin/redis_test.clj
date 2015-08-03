@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 49)
+(def n-messages 47)
 
 (def batch-size 10)
 
@@ -85,8 +85,15 @@
 (defn inject-writer-ch [event lifecycle]
   {:core.async/chan out-chan})
 
+(def cc (atom []))
+(defn inspect [event lifecycle]
+  (swap! cc conj (:onyx.core/batch event))
+  {})
+
 (def out-lifecycle
-  {:lifecycle/before-task-start inject-writer-ch})
+  {:lifecycle/before-task-start inject-writer-ch
+   :lifecycle/after-batch inspect
+   })
 
 (def lifecycles
   [{:lifecycle/task :in
@@ -135,7 +142,6 @@
  ;    :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
 
-
 (def r (take-segments! out-chan))
 
 (onyx.api/await-job-completion peer-config job-id)
@@ -147,7 +153,7 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (count r) => 21)
+(fact (count r) => 48)
 (fact (last r) => :done)
 ;(fact @retry? => false)
 
@@ -167,5 +173,3 @@
       (car/flushdb))
                                         ;(+ 11 1)
                                         ;(frequencies (map type r))
-
-;(map count @cc)

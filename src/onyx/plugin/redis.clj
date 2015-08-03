@@ -31,13 +31,9 @@
   if your batch sizes are large and steps are small, it is possible to block for
   and extended ammount of time. Returns nil if the list is exausted."
   (let [end (+ timeout (System/currentTimeMillis))
-        step-size (int (Math/floor (/ batch-size (if (= 0 steps)
-                                                   1
-                                                   steps))))
+        step-size (int (Math/floor (/ batch-size steps)))
         return (atom [])]
-    (loop [step (if (= 0 steps)
-                  1
-                  steps)
+    (loop [step steps
            end? (- end (System/currentTimeMillis))]
       (if (and (pos? end?)
                (pos? step))
@@ -78,30 +74,27 @@
                     [{:id :done
                       :input :redis
                       :message :done}])))]
-    (let [n 1]
-      (doseq [m batch]
-        (swap! pending-messages assoc (:id m) (:message m))))
+    (doseq [m batch]
+      (swap! pending-messages assoc (:id m) (:message m)))
     {:onyx.core/batch batch}))
 
 (defmethod p-ext/ack-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (println message-id)
   (let [msg (get @pending-messages message-id)]
     (swap! pending-messages dissoc message-id)))
 
 (defmethod p-ext/retry-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  ;(swap! pending-messages dissoc message-id)
-  )
+  (swap! pending-messages dissoc message-id))
 
 (defmethod p-ext/pending? :redis/read-from-set
   [{:keys [redis/pending-messages]} message-id]
-  ;(get @pending-messages message-id)
-  )
+  (get @pending-messages message-id))
 
 (defmethod p-ext/drained? :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages redis/drained?]}]
-  false)
+  (and (contains? @pending-messages :done)
+       (= 1 (count @pending-messages))))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
