@@ -8,4 +8,5 @@
                  [com.taoensso/carmine "2.11.1"]
                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
                  [midje "1.7.0"]
-                 [com.taoensso/timbre "3.4.0"]])
+                 [com.taoensso/timbre "3.4.0"]]
+  :jvm-opts ["-XX:-OmitStackTraceInFastThrow"])

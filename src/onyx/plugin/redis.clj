@@ -16,8 +16,12 @@
 
 (defn batch-load-records [conn keys]
   "Starts loading records"
-  (wcar conn (mapv (fn [key]
-                     (car/parse (partial assoc {} key) (car/smembers key))) keys)))
+  (let [records (seq
+                 (wcar conn (mapv (fn [key]
+                                    (car/parse (fn [x]
+                                                 {key x}) (car/smembers key))) keys)))]
+    (mapv (fn [record] (merge {} record))
+          records)))
 
 (defn take-from-redis [conn keystore batch-size steps timeout]
   "      conn: Carmine map for connecting to redis
@@ -85,7 +89,11 @@
 
 (defmethod p-ext/retry-message :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (swap! pending-messages dissoc message-id))
+  (if (not (= :done message-id))
+    (let [msg (get @pending-messages message-id)
+          key (first (keys msg))]
+      (wcar conn (car/rpush keystore key))
+      (swap! pending-messages dissoc message-id))))
 
 (defmethod p-ext/pending? :redis/read-from-set
   [{:keys [redis/pending-messages]} message-id]
@@ -93,8 +101,10 @@
 
 (defmethod p-ext/drained? :redis/read-from-set
   [{:keys [redis/conn redis/keystore redis/pending-messages redis/drained?]}]
-  (and (contains? @pending-messages :done)
-       (= 1 (count @pending-messages))))
+  (let [status (and (contains? @pending-messages :done)
+                    (= 1 (count @pending-messages))
+                    (= 0 (wcar conn (car/llen keystore))))]
+    status))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})

@@ -27,9 +27,9 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 47)
+(def n-messages (rand-int 200))
 
-(def batch-size 10)
+(def batch-size 7)
 
 (def redis-conn {:pool {} :spec {:host "192.168.99.100"}})
 
@@ -38,7 +38,7 @@
 ;;;;;
 ;;;;;
 (doseq [n (range n-messages)]
-  (let [message {::key (Math/abs (hash n))
+  (let [message {::key (str (Math/abs (hash n)))
                  :hello :world}]
     (wcar redis-conn
           (car/sadd (::key message) message)
@@ -48,7 +48,6 @@
 ;;;;;
 ;;;;;
 (defn my-inc [{:keys [n] :as segment}]
-  ;(swap! cn inc)
   segment)
 
 (def catalog
@@ -85,15 +84,8 @@
 (defn inject-writer-ch [event lifecycle]
   {:core.async/chan out-chan})
 
-(def cc (atom []))
-(defn inspect [event lifecycle]
-  (swap! cc conj (:onyx.core/batch event))
-  {})
-
 (def out-lifecycle
-  {:lifecycle/before-task-start inject-writer-ch
-   :lifecycle/after-batch inspect
-   })
+  {:lifecycle/before-task-start inject-writer-ch})
 
 (def lifecycles
   [{:lifecycle/task :in
@@ -107,14 +99,13 @@
 
 (def retry? (atom true))
 
-(defn retry-once [_ segment _ _]
-  (let [match (Math/abs (hash 10))
-        seg (first (flatten (vals segment)))]
-    (if (= (::key seg) match)
-      (if @retry?
-        (do (swap! retry? not)
-            true)
-        false)
+(defn retry-once [event ll segment all-new]
+                                        ;(println ll)
+  (let [match (str (Math/abs (hash 10)))
+        key (first (keys segment))]
+    (if (and (= key match) @retry?)
+      (do (reset! retry? false)
+          true)
       false)))
 
 (def constantly-true (constantly true))
@@ -139,7 +130,7 @@
     {:catalog catalog
      :workflow workflow
      :lifecycles lifecycles
- ;    :flow-conditions flow
+     :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
 
 (def r (take-segments! out-chan))
@@ -153,9 +144,9 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (count r) => 48)
+(fact (count r) => (inc n-messages))
 (fact (last r) => :done)
-;(fact @retry? => false)
+(fact @retry? => false)
 
 (let [ochan (chan)
       _ (wcar redis-conn
@@ -168,8 +159,6 @@
     (fact f => "from")
     (fact e => "earth!")))
 
-(wcar redis-conn
-      (car/flushall)
-      (car/flushdb))
-                                        ;(+ 11 1)
-                                        ;(frequencies (map type r))
+(fact (wcar redis-conn
+            (car/flushall)
+            (car/flushdb)) => ["OK" "OK"])
