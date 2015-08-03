@@ -1,4 +1,4 @@
 /target
 onyx.log
 .nrepl-port
-.lein-repl.history
+.lein-repl-history
