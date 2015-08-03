@@ -1,7 +1,7 @@
 (ns onyx.plugin.redis-test
   (:require [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.plugin.redis :refer :all]
-            [clojure.core.async :refer [chan]]
+            [clojure.core.async :refer [chan go-loop >!! <!! <!]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [midje.sweet :refer :all]
             [taoensso.carmine :as car :refer [wcar]]
@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 18)
+(def n-messages 49)
 
 (def batch-size 10)
 
@@ -47,9 +47,8 @@
 ;;;;;
 ;;;;;
 ;;;;;
-(def cn (atom 0))
 (defn my-inc [{:keys [n] :as segment}]
-  (swap! cn inc)
+  ;(swap! cn inc)
   segment)
 
 (def catalog
@@ -74,13 +73,14 @@
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
-    :onyx/doc ""}])
+    :onyx/doc ""
+    :onyx/max-peers 1}])
 
 (def workflow
   [[:in :inc]
    [:inc :out]])
 
-(def out-chan (async/chan 10))
+(def out-chan (async/chan 1000))
 
 (defn inject-writer-ch [event lifecycle]
   {:core.async/chan out-chan})
@@ -147,9 +147,9 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (count r) => 20)
+(fact (count r) => 21)
 (fact (last r) => :done)
-(fact @retry? => false)
+;(fact @retry? => false)
 
 (let [ochan (chan)
       _ (wcar redis-conn
@@ -168,6 +168,4 @@
                                         ;(+ 11 1)
                                         ;(frequencies (map type r))
 
-;(take-from-redis redis-conn ::keystore 1100 1 1000)
-
-;(println @cn)
+;(map count @cc)
