@@ -58,6 +58,8 @@
         host     (:redis/host task)
         port     (:redis/port task)
         keystore (:redis/keystore task)]
+    (when (> (:onyx/max-peers task) 1)
+      (throw (Exception. "Onyx-Redis can not run with :onyx/max-peers greater than 1")))
     {:redis/conn             {:spec {:host host :port port}}
      :redis/keystore         keystore
      :redis/drained?         (atom false)
