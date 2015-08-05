@@ -16,14 +16,16 @@
 
 (defn batch-load-records [conn keys]
   "Starts loading records"
-  (let [records (seq
-                 (wcar conn (mapv (fn [key]
-                                    (car/parse (fn [x]
-                                                 {key x}) (car/smembers key))) keys)))]
-    (mapv (fn [record] (merge {} record))
-          records)))
+  (when-let [record-batch (wcar conn (mapv
+                                    (fn [key]
+                                      (car/parse (fn [set]
+                                                   {key set})
+                                                 (car/smembers key))) keys))]
+    (if (= 1 (count record-batch))
+      [record-batch]
+      record-batch)))
 
-(defn take-from-redis [conn keystore batch-size steps timeout]
+(defn take-from-redis
   "      conn: Carmine map for connecting to redis
      keystore: The name of a redis list for looking up the relevant sets/vals
    batch-size: The maximum size of a returned batch
@@ -34,6 +36,8 @@
   finish processing the batch it's currently on before returning. This means that
   if your batch sizes are large and steps are small, it is possible to block for
   and extended ammount of time. Returns nil if the list is exausted."
+  [conn keystore batch-size steps timeout]
+
   (let [end (+ timeout (System/currentTimeMillis))
         step-size (int (Math/floor (/ batch-size steps)))
         return (atom [])]
@@ -47,7 +51,7 @@
             (recur (dec step)
                    (- end (System/currentTimeMillis))))
         (do (swap! return (partial reduce into []))
-            @return)))))
+          @return)))))
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
