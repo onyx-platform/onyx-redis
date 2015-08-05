@@ -28,7 +28,8 @@ Catalog entry:
 :onyx/type :input
 :onyx/medium :redis
 :onyx/batch-size batch-size
-:redis/conn {:pool {} :spec {:host "localhost"}}
+:redis/host "192.168.99.100"
+:redis/port 6379
 :redis/keystore :my-key-store
 :onyx/doc "Reads segments from redis"}
 ```
@@ -42,11 +43,12 @@ Lifecycle entry:
 
 #### Attributes
 
-|key                           | type      | description
-|------------------------------|-----------|------------
-|`:redis/conn`                 | `map`     | This is a [Carmine](https://github.com/ptaoussanis/carmine) connection map of the form `{:pool {<opts>} :spec {<opts>}}`
+|key                           | type                 | description
+|------------------------------|----------------------|------------
+|`:redis/host`                 | `string`             | Redis hostname
+|`:redis/port`                 | `int`                | Redis port
 |`:redis/keystore`             |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) containing each the keys of each set the plugin is concerned with
-|`:redis/step-size`            |`int`      | The step granularity to batch requests to Redis. defaults to 10
+|`:redis/step-size`            |`int`                 | The step granularity to batch requests to Redis. defaults to 10
 
 #### Contributing
 
@@ -54,6 +56,6 @@ Pull requests into the master branch are welcomed.
 
 #### License
 
-Copyright © 2015 FIX ME
+Copyright © 2015 Gardner Vickers
 
 Distributed under the Eclipse Public License, the same as Clojure.
