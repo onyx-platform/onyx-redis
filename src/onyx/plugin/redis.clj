@@ -55,9 +55,10 @@
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
-        conn     (:redis/connection task)
+        host     (:redis/host task)
+        port     (:redis/port task)
         keystore (:redis/keystore task)]
-    {:redis/conn             conn
+    {:redis/conn             {:spec {:host host :port port}}
      :redis/keystore         keystore
      :redis/drained?         (atom false)
      :redis/pending-messages (atom {})}))

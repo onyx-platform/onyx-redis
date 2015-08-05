@@ -55,7 +55,8 @@
     :onyx/ident :redis/read-from-set
     :onyx/type :input
     :onyx/medium :redis
-    :redis/connection redis-conn
+    :redis/host "192.168.99.100"
+    :redis/port 6379
     :redis/keystore ::keystore
     :redis/step-size 1
     :onyx/batch-size batch-size
