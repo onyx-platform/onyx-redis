@@ -27,9 +27,9 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 20)
+(def n-messages (rand-int 2000))
 
-(def batch-size 1)
+(def batch-size 10)
 
 (def redis-conn {:spec {:host "192.168.99.100"}})
 
