@@ -3,7 +3,8 @@
             [taoensso.carmine :as car :refer (wcar)]
             [onyx.static.default-vals :refer [arg-or-default]]
             [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
-                                        >!! >! <!! <! chan] :as async]))
+                                        >!! >! <!! <! chan] :as async]
+            [onyx.peer.function]))
 
 (defn batch-load-keys
   ([conn keystore]
@@ -66,53 +67,71 @@
      :redis/drained?         (atom false)
      :redis/pending-messages (atom {})}))
 
-(defmethod p-ext/read-batch :redis/read-from-set
-  [{:keys [onyx.core/task-map redis/conn redis/keystore
-           redis/pending-messages redis/drained? redis/step-size]}]
-  (let [pending (count @pending-messages)
-        max-pending (arg-or-default :onyx/max-pending task-map)
-        batch-size (:onyx/batch-size task-map)
-        max-segments (min (- max-pending pending) batch-size)
-        ms (arg-or-default :onyx/batch-timeout task-map)
-        batch (if (pos? max-segments)
-                (when-let [records (take-from-redis conn keystore max-segments
-                                                    (or step-size 1) ms)]
-                  (if (seq records)
-                    (mapv (fn [record]
-                            {:id (java.util.UUID/randomUUID)
-                             :input :redis
-                             :message record})
-                          records)
-                    [{:id :done
-                      :input :redis
-                      :message :done}])))]
-    (doseq [m batch]
-      (swap! pending-messages assoc (:id m) (:message m)))
-    {:onyx.core/batch batch}))
+(defrecord RedisSetReader [max-pending batch-size batch-timeout
+                           conn keystore pending-messages
+                           drained? step-size]
+  p-ext/Pipeline
+  p-ext/PipelineInput
+  (write-batch [this event]
+    (onyx.peer.function/write-batch event))
 
-(defmethod p-ext/ack-message :redis/read-from-set
-  [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (let [msg (get @pending-messages message-id)]
-    (swap! pending-messages dissoc message-id)))
+  (read-batch [_ event]
+    (let [pending (count @pending-messages)
+          max-segments (min (- max-pending pending) batch-size)
+          batch (if (pos? max-segments)
+                  (when-let [records (take-from-redis conn
+                                                      keystore max-segments
+                                                      (or step-size 1)
+                                                      batch-timeout)]
+                    (if (seq records)
+                      (mapv (fn [record]
+                              {:id (java.util.UUID/randomUUID)
+                               :input :redis
+                               :message record})
+                            records)
+                      [{:id :done
+                        :input :redis
+                        :message :done}])))]
+      (doseq [m batch]
+        (swap! pending-messages assoc (:id m) (:message m)))
+      {:onyx.core/batch batch}))
 
-(defmethod p-ext/retry-message :redis/read-from-set
-  [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
-  (if (not (= :done message-id))
-    (let [msg (get @pending-messages message-id)
-          key (:key msg)]
-      (wcar conn (car/rpush keystore key))
-      (swap! pending-messages dissoc message-id))))
+  (ack-segment
+    [_ _ segment-id]
+    (let [msg (get @pending-messages segment-id)]
+      (swap! pending-messages dissoc segment-id)))
 
-(defmethod p-ext/pending? :redis/read-from-set
-  [{:keys [redis/pending-messages]} message-id]
-  (get @pending-messages message-id))
+  (retry-segment
+    [_ _ segment-id]
+    (if (not (= :done segment-id))
+      (let [msg (get @pending-messages segment-id)
+            key (:key msg)]
+        (wcar conn (car/rpush keystore key))
+        (swap! pending-messages dissoc segment-id))))
 
-(defmethod p-ext/drained? :redis/read-from-set
-  [{:keys [redis/conn redis/keystore redis/pending-messages redis/drained?]}]
-  (let [status (and (contains? @pending-messages :done)
-                    (= 1 (count @pending-messages))
-                    (= 0 (wcar conn (car/llen keystore))))]
-    status))
+  (pending?
+    [_ _ segment-id]
+    (get @pending-messages segment-id))
+
+  (drained?
+    [_ event]
+    (and (contains? @pending-messages :done)
+         (= 1 (count @pending-messages))
+         (= 0 (wcar conn (car/llen keystore))))))
+
+(defn read-sets-from-redis [pipeline-data]
+  (let [catalog-entry    (:onyx.core/task-map pipeline-data)
+        max-pending      (arg-or-default :onyx/max-pending catalog-entry)
+        batch-size       (:onyx/batch-size catalog-entry)
+        batch-timeout    (arg-or-default :onyx/batch-timeout catalog-entry)
+        pending-messages (atom {})
+        drained?         (atom false)
+        conn             {:spec {:host (:redis/host catalog-entry)
+                                 :port (:redis/port catalog-entry)}}
+        keystore         (:redis/keystore catalog-entry)]
+    (->RedisSetReader max-pending batch-size batch-timeout
+                      conn keystore pending-messages
+                      drained? 10)))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})

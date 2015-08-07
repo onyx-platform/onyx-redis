@@ -29,7 +29,7 @@
 
 (def n-messages (rand-int 1000))
 
-(def batch-size (rand-int 30))
+(def batch-size 10)
 
 (def redis-conn {:spec {:host "192.168.99.100"}})
 
@@ -52,13 +52,14 @@
 
 (def catalog
   [{:onyx/name :in
+    :onyx/plugin :onyx.plugin.redis/read-sets-from-redis
     :onyx/ident :redis/read-from-set
     :onyx/type :input
     :onyx/medium :redis
     :redis/host "192.168.99.100"
     :redis/port 6379
     :redis/keystore ::keystore
-    :redis/step-size (rand-int 30)
+    :redis/step-size 1
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments via redis"}
@@ -69,6 +70,7 @@
     :onyx/batch-size batch-size}
 
    {:onyx/name :out
+    :onyx/plugin :onyx.plugin.core-async/output
     :onyx/ident :core.async/write-to-chan
     :onyx/type :output
     :onyx/medium :core.async
