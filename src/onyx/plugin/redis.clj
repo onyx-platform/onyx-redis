@@ -17,11 +17,12 @@
 (defn batch-load-records [conn keys]
   "Starts loading records"
   (when-let [record-batch (wcar conn (mapv
-                                    (fn [key]
-                                      (car/parse (fn [set]
-                                                   {key set})
-                                                 (car/smembers key))) keys))]
-    (if (= 1 (count record-batch))
+                                      (fn [key]
+                                        (car/parse (fn [set]
+                                                     {:key key
+                                                      :records set})
+                                                   (car/smembers key))) keys))]
+    (if (map? record-batch)
       [record-batch]
       record-batch)))
 
@@ -51,7 +52,7 @@
             (recur (dec step)
                    (- end (System/currentTimeMillis))))
         (do (swap! return (partial reduce into []))
-          @return)))))
+            @return)))))
 
 (defn inject-pending-state [event lifecycle]
   (let [task     (:onyx.core/task-map event)
@@ -98,7 +99,7 @@
   [{:keys [redis/conn redis/keystore redis/pending-messages]} message-id]
   (if (not (= :done message-id))
     (let [msg (get @pending-messages message-id)
-          key (first (keys msg))]
+          key (:key msg)]
       (wcar conn (car/rpush keystore key))
       (swap! pending-messages dissoc message-id))))
 

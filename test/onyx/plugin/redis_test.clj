@@ -27,9 +27,9 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages (rand-int 2000))
+(def n-messages (rand-int 1000))
 
-(def batch-size 10)
+(def batch-size (rand-int 30))
 
 (def redis-conn {:spec {:host "192.168.99.100"}})
 
@@ -58,7 +58,7 @@
     :redis/host "192.168.99.100"
     :redis/port 6379
     :redis/keystore ::keystore
-    :redis/step-size 1
+    :redis/step-size (rand-int 30)
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments via redis"}
@@ -101,8 +101,8 @@
 (def retry? (atom true))
 
 (defn retry-once [event _ segment all-new]
-  (let [match (str (Math/abs (hash 10)))
-        key (first (keys segment))]
+  (let [match (str (Math/abs (hash 2)))
+        key (:key segment)]
     (if (and (= key match) @retry?)
       (do (reset! retry? false)
           true)
