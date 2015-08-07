@@ -125,13 +125,14 @@
         batch-size       (:onyx/batch-size catalog-entry)
         batch-timeout    (arg-or-default :onyx/batch-timeout catalog-entry)
         pending-messages (atom {})
+        step-size        (:redis/step-size catalog-entry)
         drained?         (atom false)
         conn             {:spec {:host (:redis/host catalog-entry)
                                  :port (:redis/port catalog-entry)}}
         keystore         (:redis/keystore catalog-entry)]
     (->RedisSetReader max-pending batch-size batch-timeout
                       conn keystore pending-messages
-                      drained? 10)))
+                      drained? step-size)))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
