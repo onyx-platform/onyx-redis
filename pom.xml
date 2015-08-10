@@ -3,7 +3,7 @@
   <groupId>onyx-redis</groupId>
   <artifactId>onyx-redis</artifactId>
   <packaging>jar</packaging>
-  <version>0.6.0-6</version>
+  <version>0.7.0.0</version>
   <name>onyx-redis</name>
   <description>Onyx plugin for redis</description>
   <url>FIX ME</url>
@@ -16,7 +16,7 @@
   <scm>
     <connection>scm:git:git://github.com/gardnervickers/onyx-redis.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/gardnervickers/onyx-redis.git</developerConnection>
-    <tag>8a8b1f39844286129d87350a9ff8c248873993d3
+    <tag>5239ab33089293b8457f0e99848404bae2ff8cbf
 </tag>
     <url>https://github.com/gardnervickers/onyx-redis</url>
   </scm>
@@ -66,17 +66,23 @@
     <dependency>
       <groupId>org.clojure</groupId>
       <artifactId>clojure</artifactId>
-      <version>1.6.0</version>
+      <version>1.7.0</version>
     </dependency>
     <dependency>
       <groupId>org.onyxplatform</groupId>
       <artifactId>onyx</artifactId>
-      <version>0.6.0</version>
+      <version>0.7.0</version>
     </dependency>
     <dependency>
       <groupId>com.taoensso</groupId>
       <artifactId>carmine</artifactId>
       <version>2.11.1</version>
+      <exclusions>
+        <exclusion>
+          <groupId>com.taoensso</groupId>
+          <artifactId>timbre</artifactId>
+        </exclusion>
+      </exclusions>
     </dependency>
     <dependency>
       <groupId>org.clojure</groupId>
@@ -87,11 +93,6 @@
       <groupId>midje</groupId>
       <artifactId>midje</artifactId>
       <version>1.7.0</version>
-    </dependency>
-    <dependency>
-      <groupId>com.taoensso</groupId>
-      <artifactId>timbre</artifactId>
-      <version>3.4.0</version>
     </dependency>
     <dependency>
       <groupId>org.clojure</groupId>

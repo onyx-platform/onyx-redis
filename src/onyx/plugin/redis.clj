@@ -136,5 +136,34 @@
                       conn keystore pending-messages
                       drained? step-size)))
 
+(defrecord RedisSetWriter [conn keystore prefix]
+  p-ext/Pipeline
+  (read-batch [_ event]
+    (onyx.peer.function/read-batch event))
+
+  (write-batch [_ {:keys [onyx.core/results]}]
+    (doseq [msg (mapcat :leaves (:tree results))]
+      (let [segment (:message msg)
+            key     (if prefix
+                      (str prefix (:key segment))
+                      (:key segment))
+            records (:records segment)]
+        (wcar conn
+              (mapv #(car/sadd key %) records)
+              (car/lpush keystore key))
+        {:onyx.core/written? true})))
+  (seal-resource [_ _]
+    {}))
+
+(defn write-to-set [pipeline-data]
+  (let [catalog-entry (:onyx.core/task-map pipeline-data)
+        keystore      (:redis/keystore catalog-entry)
+        conn          {:spec {:host (:redis/host catalog-entry)
+                              :port (:redis/port catalog-entry)
+                              :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
+                                                   4000)}}
+        prefix        (or (:redis/key-prefix catalog-entry) nil)]
+    (->RedisSetWriter conn keystore prefix)))
+
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})

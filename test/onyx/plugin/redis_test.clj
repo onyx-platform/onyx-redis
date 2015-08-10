@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages (rand-int 1000))
+(def n-messages 1000)
 
 (def batch-size 8)
 
@@ -76,11 +76,22 @@
     :onyx/medium :core.async
     :onyx/batch-size batch-size
     :onyx/doc ""
-    :onyx/max-peers 1}])
+    :onyx/max-peers 1}
+
+   {:onyx/name :out-redis
+    :onyx/plugin :onyx.plugin.redis/write-to-set
+    :onyx/ident :redis/write-to-set
+    :onyx/type :output
+    :onyx/medium :redis
+    :redis/key-prefix "initial"
+    :redis/host "127.0.0.1"
+    :redis/port 6379
+    :redis/keystore ::keystore-out
+    :onyx/batch-size batch-size}])
 
 (def workflow
   [[:in :inc]
-   [:inc :out]])
+   [:inc :out-redis]])
 
 (def out-chan (async/chan 1000))
 
@@ -120,7 +131,7 @@
     :flow/action :retry}
 
    {:flow/from :inc
-    :flow/to [:out]
+    :flow/to [:out-redis]
     :flow/predicate ::constantly-true}])
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
@@ -135,7 +146,7 @@
      :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
 
-(def r (take-segments! out-chan))
+                                        ;(def r (take-segments! out-chan))
 
 (onyx.api/await-job-completion peer-config job-id)
 
@@ -146,8 +157,9 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (count r) => (inc n-messages))
-(fact (last r) => :done)
+(fact (wcar redis-conn
+            (car/llen ::keystore-out)) => n-messages)
+
 (fact @retry? => false)
 
 (let [ochan (chan)
