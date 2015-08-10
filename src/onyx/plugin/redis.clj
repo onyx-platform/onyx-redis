@@ -63,7 +63,7 @@
         keystore (:redis/keystore task)]
     (when (> (:onyx/max-peers task) 1)
       (throw (Exception. "Onyx-Redis can not run with :onyx/max-peers greater than 1")))
-    {:redis/conn             {:spec {:host host :port port} :pool {}}
+    {:redis/conn             {:spec {:host host :port port} :pool nil}
      :redis/keystore         keystore
      :redis/drained?         (atom false)
      :redis/pending-messages (atom {})}))
@@ -128,7 +128,7 @@
         pending-messages (atom {})
         step-size        (:redis/step-size catalog-entry)
         drained?         (atom false)
-        conn             {:pool {}
+        conn             {:pool nil
                           :spec {:host (:redis/host catalog-entry)
                                  :port (:redis/port catalog-entry)
                                  :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
