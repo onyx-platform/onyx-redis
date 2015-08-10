@@ -128,7 +128,9 @@
         step-size        (:redis/step-size catalog-entry)
         drained?         (atom false)
         conn             {:spec {:host (:redis/host catalog-entry)
-                                 :port (:redis/port catalog-entry)}}
+                                 :port (:redis/port catalog-entry)
+                                 :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
+                                                      4000)}}
         keystore         (:redis/keystore catalog-entry)]
     (->RedisSetReader max-pending batch-size batch-timeout
                       conn keystore pending-messages

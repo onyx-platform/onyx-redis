@@ -49,6 +49,7 @@ Lifecycle entry:
 |`:redis/port`                 | `int`                | Redis port
 |`:redis/keystore`             |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) containing each the keys of each set the plugin is concerned with
 |`:redis/step-size`            |`int`                 | The step granularity to batch requests to Redis. defaults to 10
+|`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to read from Redis.
 
 #### Contributing
 

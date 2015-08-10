@@ -31,7 +31,7 @@
 
 (def batch-size 8)
 
-(def redis-conn {:spec {:host "192.168.99.100"}})
+(def redis-conn {:spec {:host "127.0.0.1"}})
 
 
 ;;;;; Load up the redis with test data
@@ -56,7 +56,7 @@
     :onyx/ident :redis/read-from-set
     :onyx/type :input
     :onyx/medium :redis
-    :redis/host "192.168.99.100"
+    :redis/host "127.0.0.1"
     :redis/port 6379
     :redis/keystore ::keystore
     :redis/step-size 5
