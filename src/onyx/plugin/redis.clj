@@ -4,7 +4,8 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
                                         >!! >! <!! <! chan] :as async]
-            [onyx.peer.function]))
+            [onyx.peer.function]
+            [taoensso.carmine.connections]))
 
 (defn batch-load-keys
   ([conn keystore]
@@ -62,7 +63,7 @@
         keystore (:redis/keystore task)]
     (when (> (:onyx/max-peers task) 1)
       (throw (Exception. "Onyx-Redis can not run with :onyx/max-peers greater than 1")))
-    {:redis/conn             {:spec {:host host :port port}}
+    {:redis/conn             {:spec {:host host :port port} :pool {}}
      :redis/keystore         keystore
      :redis/drained?         (atom false)
      :redis/pending-messages (atom {})}))
@@ -127,7 +128,8 @@
         pending-messages (atom {})
         step-size        (:redis/step-size catalog-entry)
         drained?         (atom false)
-        conn             {:spec {:host (:redis/host catalog-entry)
+        conn             {:pool {}
+                          :spec {:host (:redis/host catalog-entry)
                                  :port (:redis/port catalog-entry)
                                  :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
                                                       4000)}}

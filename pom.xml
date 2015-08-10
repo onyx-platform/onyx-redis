@@ -3,7 +3,7 @@
   <groupId>onyx-redis</groupId>
   <artifactId>onyx-redis</artifactId>
   <packaging>jar</packaging>
-  <version>0.7.0.0</version>
+  <version>0.7.0.2</version>
   <name>onyx-redis</name>
   <description>Onyx plugin for redis</description>
   <url>FIX ME</url>
@@ -16,7 +16,7 @@
   <scm>
     <connection>scm:git:git://github.com/gardnervickers/onyx-redis.git</connection>
     <developerConnection>scm:git:ssh://git@github.com/gardnervickers/onyx-redis.git</developerConnection>
-    <tag>5239ab33089293b8457f0e99848404bae2ff8cbf
+    <tag>6db8cddaf5aca1f1eb38d0e33ccc45439f47cbf1
 </tag>
     <url>https://github.com/gardnervickers/onyx-redis</url>
   </scm>
