@@ -53,7 +53,7 @@ Lifecycle entry:
 
 ```clojure
 [{:lifecycle/task :input-task
- :lifecycle/calls :onyx.plugin.redis/reader-state-calls}]
+  :lifecycle/calls :onyx.plugin.redis/reader-state-calls}]
 ```
 
 #### Attributes

@@ -27,7 +27,7 @@
 
 (def peer-group (onyx.api/start-peer-group peer-config))
 
-(def n-messages 1000)
+(def n-messages (rand-int 1000))
 
 (def batch-size 8)
 
@@ -145,8 +145,6 @@
      :lifecycles lifecycles
      :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
-
-                                        ;(def r (take-segments! out-chan))
 
 (onyx.api/await-job-completion peer-config job-id)
 
