@@ -146,9 +146,7 @@
   (write-batch [_ {:keys [onyx.core/results]}]
     (doseq [msg (mapcat :leaves (:tree results))]
       (let [segment (:message msg)
-            key     (if prefix
-                      (str prefix (:key segment))
-                      (:key segment))
+            key     (str prefix (:key segment))
             records (:records segment)]
         (wcar conn
               (mapv #(car/sadd key %) records)
