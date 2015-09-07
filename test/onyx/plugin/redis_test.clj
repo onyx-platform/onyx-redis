@@ -155,21 +155,17 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (wcar redis-conn
-            (car/llen ::keystore-out)) => n-messages)
+(let [ks (wcar redis-conn
+               (car/lrange ::keystore-out 0 100000))]
+
+  (fact (count ks) => n-messages)
+  (fact (count (car/wcar redis-conn
+                         (mapv (fn [k]
+                                 (set (car/smembers k)))
+                               ks)))
+               => n-messages))
 
 (fact @retry? => false)
-
-(let [ochan (chan)
-      _ (wcar redis-conn
-              (mapv (partial car/lpush :testtest)
-                    (reverse (clojure.string/split
-                              "hello from earth!" #" "))))
-      res (batch-load-keys redis-conn :testtest 3)]
-  (let [[h f e] res]
-    (fact h => "hello")
-    (fact f => "from")
-    (fact e => "earth!")))
 
 (fact (wcar redis-conn
             (car/flushall)

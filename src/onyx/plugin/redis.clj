@@ -4,6 +4,7 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
                                         >!! >! <!! <! chan] :as async]
+            [taoensso.timbre :refer [info]]
             [onyx.peer.function]
             [taoensso.carmine.connections]))
 
@@ -138,7 +139,7 @@
                       conn keystore pending-messages
                       drained? step-size)))
 
-(defrecord RedisWriter [conn keystore prefix]
+(defrecord RedisSetWriter [conn keystore prefix]
   p-ext/Pipeline
   (read-batch [_ event]
     (onyx.peer.function/read-batch event))
@@ -155,7 +156,37 @@
   (seal-resource [_ _]
     {}))
 
-(defn write [pipeline-data]
+(defn write-to-set [pipeline-data]
+  (let [catalog-entry (:onyx.core/task-map pipeline-data)
+        keystore      (:redis/keystore catalog-entry)
+        conn          {:spec {:host (:redis/host catalog-entry)
+                              :port (:redis/port catalog-entry)
+                              :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
+                                                   4000)}}
+        prefix        (or (:redis/key-prefix catalog-entry) nil)]
+    (->RedisSetWriter conn keystore prefix)))
+
+(defrecord Ops [sadd lpush])
+
+(def operations 
+  (->Ops car/sadd car/lpush))
+
+(defrecord RedisWriter [conn keystore prefix]
+  p-ext/Pipeline
+  (read-batch [_ event]
+    (onyx.peer.function/read-batch event))
+
+  (write-batch [_ {:keys [onyx.core/results]}]
+    (wcar conn 
+          (map (fn [{:keys [message] :as leaf}] 
+                  (let [op ((:op message) operations)] 
+                    (op (car/key prefix (:key message)) (:value message)))) 
+                (mapcat :leaves (:tree results))))
+    {})
+  (seal-resource [_ _]
+    {}))
+
+(defn writer [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
         keystore      (:redis/keystore catalog-entry)
         conn          {:spec {:host (:redis/host catalog-entry)
