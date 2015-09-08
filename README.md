@@ -49,7 +49,7 @@ Where op is one of:
 ```
 :sadd, :zadd, :lpush, :set
 ```
-These correspond to their equivalent calls in carmine, see [documentation] (https://github.com/ptaoussanis/carmine/blob/master/src/commands/commands.list).
+These correspond to their equivalent calls in carmine, see [documentation] (http://ptaoussanis.github.io/carmine/).
 
 ##### Inject Connection Spec lifecycle
 
