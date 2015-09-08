@@ -1,6 +1,6 @@
-(defproject onyx-redis "0.7.3.0"
+(defproject org.onyxplatform/onyx-redis "0.7.3.0"
   :description "Onyx plugin for redis"
-  :url "FIX ME"
+  :url "https://github.com/onyx-platform/onyx-redis"
   :license {:name "Eclipse Public License"
             :url "http://www.eclipse.org/legal/epl-v10.html"}
   :dependencies [[org.clojure/clojure "1.7.0"]
