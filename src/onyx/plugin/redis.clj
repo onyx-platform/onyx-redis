@@ -24,10 +24,10 @@
 (def reader-conn-spec
   {:lifecycle/before-task-start inject-conn-spec})
 
-(defrecord Ops [sadd lpush zadd])
+(defrecord Ops [sadd lpush zadd set])
 
 (def operations 
-  (->Ops car/sadd car/lpush car/zadd))
+  (->Ops car/sadd car/lpush car/zadd car/set))
 
 (defrecord RedisWriter [conn keystore]
   p-ext/Pipeline

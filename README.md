@@ -20,15 +20,38 @@ In your peer boot-up namespace:
 
 ##### Write to Redis
 
+Example:
+
+```clojure
+{:onyx/name :out-to-redis
+ :onyx/plugin :onyx.plugin.redis/writer
+ :onyx/type :output
+ :onyx/medium :redis
+ :redis/host "127.0.0.1"
+ :redis/port 6379
+ :onyx/batch-size batch-size}
+```
+
+###### Attributes
+
 |key                           | type                 | description
 |------------------------------|----------------------|------------
 |`:redis/host`                 | `string`             | Redis hostname
 |`:redis/port`                 | `int`                | Redis port
-|`:redis/keystore`             |`keyword` or `string` | A Redis key to write a reference key for each output.
-|`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to write to Redis.
+|`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to write to Redis.
 
+Segments should be supplied to the plugin in the form:
+```clojure
+{:op :sadd :key redis-key :value redis-value}
+```
 
-###### Inject Connection Spec lifecycle
+Where op is one of:
+```
+:sadd, :zadd, :lpush, :set
+```
+These correspond to their equivalent calls in carmine, see [documentation] (https://github.com/ptaoussanis/carmine/blob/master/src/commands/commands.list).
+
+##### Inject Connection Spec lifecycle
 
 Injects an carmine connection spec into the event map. Will also inject as an :onyx/fn param if :onyx/param? is true.
 
@@ -57,6 +80,8 @@ Alternatively, the conn that is created is placed under `:redis/conn` in the
 event map, for use within lifecycles e.g. :before-batch. Use in this way allows
 requests to be batched.
 
+Please see the Carmine documentation for examples for how to use Carmine.
+
 ##### Read Sets from Redis Input Plugin
 
 Catalog entry:
@@ -64,28 +89,17 @@ Catalog entry:
 ```clojure
 
 {:onyx/name :in-from-redis
-:onyx/plugin :onyx.plugin.redis/read-sets-from-redis
-:onyx/ident :redis/read-from-set
-:onyx/type :input
-:onyx/medium :redis
-:redis/host "127.0.0.1"
-:redis/port 6379
-:redis/keystore ::keystore
-:redis/step-size 5
-:onyx/batch-size batch-size
-:onyx/max-peers 1
-:onyx/doc "Reads segments via redis"}
+ :onyx/plugin :onyx.plugin.redis/read-sets-from-redis
+ :onyx/type :input
+ :onyx/medium :redis
+ :redis/host "127.0.0.1"
+ :redis/port 6379
+ :redis/keystore ::keystore
+ :redis/step-size 5
+ :onyx/batch-size batch-size
+ :onyx/max-peers 1
+ :onyx/doc "Reads segments via redis"}
 
-{:onyx/name :out-to-redis
-:onyx/plugin :onyx.plugin.redis/write-to-set
-:onyx/ident :redis/write-to-set
-:onyx/type :output
-:onyx/medium :redis
-:redis/key-prefix "new"
-:redis/host "127.0.0.1"
-:redis/port 6379
-:redis/keystore ::keystore-out
-:onyx/batch-size batch-size}
 ```
 
 Lifecycle entry:
@@ -95,8 +109,7 @@ Lifecycle entry:
   :lifecycle/calls :onyx.plugin.redis/reader-state-calls}]
 ```
 
-#### Attributes
-##### Read from Redis
+###### Attributes
 
 |key                           | type                 | description
 |------------------------------|----------------------|------------

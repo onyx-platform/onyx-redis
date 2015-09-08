@@ -72,10 +72,8 @@
     :onyx/plugin :onyx.plugin.redis/writer
     :onyx/type :output
     :onyx/medium :redis
-    :redis/key-prefix "initial"
     :redis/host "127.0.0.1"
     :redis/port 6379
-    :redis/keystore ::keystore-out
     :onyx/batch-size batch-size}])
 
 (def workflow
@@ -103,13 +101,13 @@
 
 (fact (sort-by :name 
                (car/wcar redis-conn
-                         (set (car/smembers (car/key "initial" "cyclists")))))
+                         (set (car/smembers "cyclists"))))
       => 
       [{:name "Jane" :age 25}
        {:name "John" :age 20}])
 
 (fact (sort-by :name 
                (car/wcar redis-conn
-                         (set (car/smembers (car/key "initial" "runners")))))
+                         (set (car/smembers "runners"))))
       => 
       [{:name "Mike" :age 24}])
