@@ -74,7 +74,6 @@ Lifecycle entry:
 |`:redis/host`                 | `string`             | Redis hostname
 |`:redis/port`                 | `int`                | Redis port
 |`:redis/keystore`             |`keyword` or `string` | A Redis key to write a reference key for each output.
-|`:redis/key-prefix`           |`str`                 | A prefix for each set key. Leave blank for update-in-place.
 |`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to write to Redis.
 
 #### Contributing

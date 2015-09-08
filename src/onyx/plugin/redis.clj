@@ -139,49 +139,23 @@
                       conn keystore pending-messages
                       drained? step-size)))
 
-(defrecord RedisSetWriter [conn keystore prefix]
-  p-ext/Pipeline
-  (read-batch [_ event]
-    (onyx.peer.function/read-batch event))
-
-  (write-batch [_ {:keys [onyx.core/results]}]
-    (doseq [msg (mapcat :leaves (:tree results))]
-      (let [segment (:message msg)
-            key     (str prefix (:key segment))
-            records (:records segment)]
-        (wcar conn
-              (mapv #(car/sadd key %) records)
-              (car/lpush keystore key))
-        {:onyx.core/written? true})))
-  (seal-resource [_ _]
-    {}))
-
-(defn write-to-set [pipeline-data]
-  (let [catalog-entry (:onyx.core/task-map pipeline-data)
-        keystore      (:redis/keystore catalog-entry)
-        conn          {:spec {:host (:redis/host catalog-entry)
-                              :port (:redis/port catalog-entry)
-                              :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
-                                                   4000)}}
-        prefix        (or (:redis/key-prefix catalog-entry) nil)]
-    (->RedisSetWriter conn keystore prefix)))
-
-(defrecord Ops [sadd lpush])
+(defrecord Ops [sadd lpush zadd])
 
 (def operations 
-  (->Ops car/sadd car/lpush))
+  (->Ops car/sadd car/lpush car/zadd))
 
-(defrecord RedisWriter [conn keystore prefix]
+(defrecord RedisWriter [conn keystore]
   p-ext/Pipeline
   (read-batch [_ event]
     (onyx.peer.function/read-batch event))
 
   (write-batch [_ {:keys [onyx.core/results]}]
     (wcar conn 
-          (map (fn [{:keys [message] :as leaf}] 
-                  (let [op ((:op message) operations)] 
-                    (op (car/key prefix (:key message)) (:value message)))) 
-                (mapcat :leaves (:tree results))))
+          (doall 
+            (map (fn [{:keys [message]}] 
+                   (let [op ((:op message) operations)] 
+                     (op (:key message) (:value message)))) 
+                 (mapcat :leaves (:tree results)))))
     {})
   (seal-resource [_ _]
     {}))
@@ -192,9 +166,8 @@
         conn          {:spec {:host (:redis/host catalog-entry)
                               :port (:redis/port catalog-entry)
                               :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
-                                                   4000)}}
-        prefix        (or (:redis/key-prefix catalog-entry) nil)]
-    (->RedisWriter conn keystore prefix)))
+                                                   4000)}}]
+    (->RedisWriter conn keystore)))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})

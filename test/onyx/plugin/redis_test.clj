@@ -4,6 +4,7 @@
             [clojure.core.async :refer [chan go-loop >!! <!! <!]]
             [onyx.plugin.core-async :refer [take-segments!]]
             [midje.sweet :refer :all]
+            [taoensso.timbre :refer [info]]
             [taoensso.carmine :as car :refer [wcar]]
             [clojure.core.async :as async :refer [chan <!! >!!]]
             [onyx.api]))
@@ -50,6 +51,18 @@
 (defn my-inc [{:keys [n] :as segment}]
   segment)
 
+
+(defn create-writes [{:keys [records key]}]
+  (let [k (str "initial" key)] 
+    (conj (map (fn [record]
+                 {:key k
+                  :value record
+                  :op :lpush})
+               records)
+          {:key ::keystore-out
+           :value k
+           :op :lpush})))
+
 (def catalog
   [{:onyx/name :in
     :onyx/plugin :onyx.plugin.redis/read-sets-from-redis
@@ -79,11 +92,12 @@
     :onyx/max-peers 1}
 
    {:onyx/name :out-redis
-    :onyx/plugin :onyx.plugin.redis/write-to-set
-    :onyx/ident :redis/write-to-set
+    :onyx/plugin :onyx.plugin.redis/writer
+    :onyx/ident :redis/write
     :onyx/type :output
     :onyx/medium :redis
-    :redis/key-prefix "initial"
+    :onyx/fn ::create-writes
+    ;;:redis/key-prefix "initial"
     :redis/host "127.0.0.1"
     :redis/port 6379
     :redis/keystore ::keystore-out
