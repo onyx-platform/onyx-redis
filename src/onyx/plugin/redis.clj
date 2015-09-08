@@ -58,7 +58,8 @@
             @return)))))
 
 (defn inject-pending-state [event lifecycle]
-  (let [task     (:onyx.core/task-map event)
+  (let [pipeline (:onyx.core/pipeline event)
+        task     (:onyx.core/task-map event)
         host     (:redis/host task)
         port     (:redis/port task)
         keystore (:redis/keystore task)]
@@ -66,8 +67,8 @@
       (throw (Exception. "Onyx-Redis can not run with :onyx/max-peers greater than 1")))
     {:redis/conn             {:spec {:host host :port port} :pool nil}
      :redis/keystore         keystore
-     :redis/drained?         (atom false)
-     :redis/pending-messages (atom {})}))
+     :redis/drained?         (:drained? pipeline)
+     :redis/pending-messages (:pending-messages pipeline)}))
 
 (defrecord RedisSetReader [max-pending batch-size batch-timeout
                            conn keystore pending-messages
