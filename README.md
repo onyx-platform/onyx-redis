@@ -18,7 +18,46 @@ In your peer boot-up namespace:
 
 #### Functions
 
-##### sample-entry
+##### Write to Redis
+
+|key                           | type                 | description
+|------------------------------|----------------------|------------
+|`:redis/host`                 | `string`             | Redis hostname
+|`:redis/port`                 | `int`                | Redis port
+|`:redis/keystore`             |`keyword` or `string` | A Redis key to write a reference key for each output.
+|`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to write to Redis.
+
+
+###### Inject Connection Spec lifecycle
+
+Injects an carmine connection spec into the event map. Will also inject as an :onyx/fn param if :onyx/param? is true.
+
+```clojure
+{:lifecycle/task :use-redis-task
+ :lifecycle/calls :onyx.plugin.redis/reader-conn-spec
+ :redis/host redis-hostname
+ :redis/port redis-port
+ :redis/read-timeout-ms <<optional-timeout>>
+ :onyx/param? true
+ :lifecycle/doc "Initialises redis conn spec into event map, or as a :onyx.core/param"}
+```
+
+When used with task :use-redis-task and with :onyx/param? true, you can use it from your function e.g.
+
+```clojure
+(ns your.ns
+  (:require [taoensso.carmine :as car :refer (wcar)]))
+
+(defn use-redis-task-fn [conn segment]
+  (wcar conn
+        [(car/smembers (:key segment)])))
+```
+
+Alternatively, the conn that is created is placed under `:redis/conn` in the
+event map, for use within lifecycles e.g. :before-batch. Use in this way allows
+requests to be batched.
+
+##### Read Sets from Redis Input Plugin
 
 Catalog entry:
 
@@ -66,15 +105,6 @@ Lifecycle entry:
 |`:redis/keystore`             |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) containing each the keys of each set the plugin is concerned with
 |`:redis/step-size`            |`int`                 | The step granularity to batch requests to Redis. defaults to 10
 |`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to read from Redis.
-
-##### Write to Redis
-
-|key                           | type                 | description
-|------------------------------|----------------------|------------
-|`:redis/host`                 | `string`             | Redis hostname
-|`:redis/port`                 | `int`                | Redis port
-|`:redis/keystore`             |`keyword` or `string` | A Redis key to write a reference key for each output.
-|`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to write to Redis.
 
 #### Contributing
 

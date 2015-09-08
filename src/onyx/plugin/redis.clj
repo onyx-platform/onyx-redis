@@ -8,6 +8,52 @@
             [onyx.peer.function]
             [taoensso.carmine.connections]))
 
+(defn inject-conn-spec [{:keys [onyx.core/params] :as event} 
+                         {:keys [onyx/param?
+                                 redis/host redis/port redis/read-timeout-ms] :as lifecycle}]
+  (when-not (and host port)
+    (throw (ex-info "Missing :redis/host or :redis/port in inject-redis-spec lifecyle." lifecycle)))
+  (let [conn {:spec {:host host 
+                     :port port 
+                     :read-timeout-ms (or read-timeout-ms 4000)}}]
+    {:onyx.core/params (if param?
+                         (conj params conn)
+                         params)
+     :redis/conn conn}))
+
+(def reader-conn-spec
+  {:lifecycle/before-task-start inject-conn-spec})
+
+(defrecord Ops [sadd lpush zadd])
+
+(def operations 
+  (->Ops car/sadd car/lpush car/zadd))
+
+(defrecord RedisWriter [conn keystore]
+  p-ext/Pipeline
+  (read-batch [_ event]
+    (onyx.peer.function/read-batch event))
+
+  (write-batch [_ {:keys [onyx.core/results]}]
+    (wcar conn 
+          (doall 
+            (map (fn [{:keys [message]}] 
+                   (let [op ((:op message) operations)] 
+                     (op (:key message) (:value message)))) 
+                 (mapcat :leaves (:tree results)))))
+    {})
+  (seal-resource [_ _]
+    {}))
+
+(defn writer [pipeline-data]
+  (let [catalog-entry (:onyx.core/task-map pipeline-data)
+        keystore      (:redis/keystore catalog-entry)
+        conn          {:spec {:host (:redis/host catalog-entry)
+                              :port (:redis/port catalog-entry)
+                              :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
+                                                   4000)}}]
+    (->RedisWriter conn keystore)))
+
 (defn batch-load-keys
   ([conn keystore]
    (batch-load-keys conn keystore 100))
@@ -139,36 +185,6 @@
     (->RedisSetReader max-pending batch-size batch-timeout
                       conn keystore pending-messages
                       drained? step-size)))
-
-(defrecord Ops [sadd lpush zadd])
-
-(def operations 
-  (->Ops car/sadd car/lpush car/zadd))
-
-(defrecord RedisWriter [conn keystore]
-  p-ext/Pipeline
-  (read-batch [_ event]
-    (onyx.peer.function/read-batch event))
-
-  (write-batch [_ {:keys [onyx.core/results]}]
-    (wcar conn 
-          (doall 
-            (map (fn [{:keys [message]}] 
-                   (let [op ((:op message) operations)] 
-                     (op (:key message) (:value message)))) 
-                 (mapcat :leaves (:tree results)))))
-    {})
-  (seal-resource [_ _]
-    {}))
-
-(defn writer [pipeline-data]
-  (let [catalog-entry (:onyx.core/task-map pipeline-data)
-        keystore      (:redis/keystore catalog-entry)
-        conn          {:spec {:host (:redis/host catalog-entry)
-                              :port (:redis/port catalog-entry)
-                              :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
-                                                   4000)}}]
-    (->RedisWriter conn keystore)))
 
 (def reader-state-calls
   {:lifecycle/before-task-start inject-pending-state})
