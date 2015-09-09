@@ -84,6 +84,12 @@ Please see the Carmine documentation for examples for how to use Carmine.
 
 ##### Consume from Key Input Plugin
 
+Consumes from a redis set or list. 
+
+**NOTE** this plugin does not currently support any state recovery at all - if
+a peer crashes any pending segments (those that have been read from the set or
+list and are not fully acked) will be lost.
+
 Catalog entry:
 
 ```clojure
