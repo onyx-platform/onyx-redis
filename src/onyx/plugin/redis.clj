@@ -10,10 +10,10 @@
             [taoensso.carmine.connections]))
 
 
-(defrecord Ops [sadd lpush zadd set lpop spop])
+(defrecord Ops [sadd lpush zadd set lpop spop rpop])
 
 (def operations 
-  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop))
+  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
@@ -78,6 +78,28 @@
   (empty? (remove #(= :done (:message %))
                   messages)))
 
+(defn take-from-redis
+  "conn: Carmine map for connecting to redis
+  key: The name of a redis key for looking up the relevant values
+  batch-size: The maximum size of a returned batch
+  timeout: stop processing new collections after `timeout`/ms''
+
+  In order to stay consistent in Redis list consumption, this function will
+  finish processing the batch it's currently on before returning. This means that
+  if your batch sizes are large and steps are small, it is possible to block for
+  and extended ammount of time. Returns nil if the list is exausted."
+  [conn k batch-size timeout]
+  (let [end (+ timeout (System/currentTimeMillis))]
+    (loop [return []]
+      (if (and (< (System/currentTimeMillis) end)
+               (< (count return) batch-size)) 
+        (let [vs (wcar conn
+                       (doall (map (fn [_]
+                                     (car/lpop k))
+                                   (range (- batch-size (count return))))))]
+              (recur (into return vs))) 
+        return))))
+
 (defrecord RedisConsumer [max-pending batch-size batch-timeout conn k pending-messages drained?]
   p-ext/Pipeline
   p-ext/PipelineInput
@@ -88,17 +110,14 @@
     (let [pending (count @pending-messages)
           max-segments (min (- max-pending pending) batch-size)
           batch (keep (fn [v]
-                        (cond (= v "done") 
-                              (t/input (java.util.UUID/randomUUID)
-                                       :done)
-                              v
-                              (t/input (java.util.UUID/randomUUID)
-                                       {:key k
-                                        :value v}))) 
-                      (wcar conn
-                            (doall (map (fn [_]
-                                          (car/lpop k))
-                                        (range max-segments)))))]
+                       (cond (= v "done") 
+                             (t/input (java.util.UUID/randomUUID)
+                                      :done)
+                             v
+                             (t/input (java.util.UUID/randomUUID)
+                                      {:key k
+                                       :value v}))) 
+                     (take-from-redis conn k batch-size batch-timeout))]
       (if (and (all-done? (vals @pending-messages))
                (all-done? batch)
                (or (not (empty? @pending-messages))

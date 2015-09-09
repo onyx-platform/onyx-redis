@@ -102,6 +102,8 @@ Catalog entry:
 
 ```
 
+Currently supported `:redis/op` consume operations are `:lpop`, `:rpop`, and `:spop`.
+
 Lifecycle entry:
 
 ```clojure
@@ -116,7 +118,7 @@ Lifecycle entry:
 |`:redis/host`                 | `string`             | Redis hostname
 |`:redis/port`                 | `int`                | Redis port
 |`:redis/key`                  |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) or set containing segments
-|`:redis/op`                   |`keyword`             | A Redis datastructure operation (currently only :lpop or :spop are allowed
+|`:redis/op`                   |`keyword`             | A Redis datastructure operation (:lpop / :rpop/ :spop)
 
 #### Contributing
 
