@@ -34,45 +34,36 @@
 
 (def redis-conn {:spec {:host "127.0.0.1"}})
 
+(fact (wcar redis-conn
+            (car/flushall)
+            (car/flushdb)) => ["OK" "OK"])
 
-;;;;; Load up the redis with test data
-;;;;;
-;;;;;
-(doseq [n (range n-messages)]
-  (let [message {::key (str (Math/abs (hash n)))
-                 :hello :world}]
-    (wcar redis-conn
-          (car/sadd (::key message) message)
-          (car/lpush ::keystore (::key message)))))
+(wcar redis-conn
+      (mapv (fn [n]
+             (car/lpush ::store {:n n}))
+           (range n-messages))
+      (car/lpush ::store :done))
 
 ;;;;;
 ;;;;;
 ;;;;;
-(defn my-inc [{:keys [n] :as segment}]
-  segment)
+(defn my-inc [segment]
+  (update (:value segment) :n inc))
 
-
-(defn create-writes [{:keys [records key]}]
-  (let [k (str "initial" key)] 
-    (conj (map (fn [record]
-                 {:key k
-                  :value record
-                  :op :lpush})
-               records)
-          {:key ::keystore-out
-           :value k
-           :op :lpush})))
+(defn create-writes [segment]
+  {:key ::store-out
+   :value segment
+   :op :lpush})
 
 (def catalog
   [{:onyx/name :in
-    :onyx/plugin :onyx.plugin.redis/read-sets-from-redis
-    :onyx/ident :redis/read-from-set
+    :onyx/plugin :onyx.plugin.redis/consumer
     :onyx/type :input
     :onyx/medium :redis
     :redis/host "127.0.0.1"
     :redis/port 6379
-    :redis/keystore ::keystore
-    :redis/step-size 5
+    :redis/key ::store
+    :redis/op :lpop
     :onyx/batch-size batch-size
     :onyx/max-peers 1
     :onyx/doc "Reads segments via redis"}
@@ -82,25 +73,14 @@
     :onyx/type :function
     :onyx/batch-size batch-size}
 
-   {:onyx/name :out
-    :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/ident :core.async/write-to-chan
-    :onyx/type :output
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/doc ""
-    :onyx/max-peers 1}
-
    {:onyx/name :out-redis
     :onyx/plugin :onyx.plugin.redis/writer
     :onyx/ident :redis/write
     :onyx/type :output
     :onyx/medium :redis
     :onyx/fn ::create-writes
-    ;;:redis/key-prefix "initial"
     :redis/host "127.0.0.1"
     :redis/port 6379
-    :redis/keystore ::keystore-out
     :onyx/batch-size batch-size}])
 
 (def workflow
@@ -117,36 +97,7 @@
 
 (def lifecycles
   [{:lifecycle/task :in
-    :lifecycle/calls :onyx.plugin.redis/reader-state-calls}
-
-   {:lifecycle/task :out
-    :lifecycle/calls ::out-lifecycle}
-
-   {:lifecycle/task :out
-    :lifecycle/calls :onyx.plugin.core-async/writer-calls}])
-
-(def retry? (atom true))
-
-(defn retry-once [event _ segment all-new]
-  (let [match (str (Math/abs (hash 2)))
-        key (:key segment)]
-    (if (and (= key match) @retry?)
-      (do (reset! retry? false)
-          true)
-      false)))
-
-(def constantly-true (constantly true))
-
-(def flow
-  [{:flow/from :inc
-    :flow/to :none
-    :flow/short-circuit? true
-    :flow/predicate ::retry-once
-    :flow/action :retry}
-
-   {:flow/from :inc
-    :flow/to [:out-redis]
-    :flow/predicate ::constantly-true}])
+    :lifecycle/calls :onyx.plugin.redis/reader-state-calls}])
 
 (def v-peers (onyx.api/start-peers 3 peer-group))
 
@@ -157,10 +108,11 @@
     {:catalog catalog
      :workflow workflow
      :lifecycles lifecycles
-     :flow-conditions flow
      :task-scheduler :onyx.task-scheduler/balanced})))
 
 (onyx.api/await-job-completion peer-config job-id)
+
+(Thread/sleep 10000)
 
 (doseq [v-peer v-peers]
   (onyx.api/shutdown-peer v-peer))
@@ -169,17 +121,13 @@
 
 (onyx.api/shutdown-env env)
 
-(let [ks (wcar redis-conn
-               (car/lrange ::keystore-out 0 100000))]
-
-  (fact (count ks) => n-messages)
-  (fact (count (car/wcar redis-conn
-                         (mapv (fn [k]
-                                 (set (car/smembers k)))
-                               ks)))
-               => n-messages))
-
-(fact @retry? => false)
+(let [vs (sort-by :n 
+                  (wcar redis-conn
+                        (car/lrange ::store-out 0 100000)))]
+  (fact vs => 
+        (map (fn [v]
+               {:n (inc v)})
+             (range n-messages))))
 
 (fact (wcar redis-conn
             (car/flushall)
