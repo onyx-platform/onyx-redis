@@ -158,13 +158,14 @@
         batch-timeout    (arg-or-default :onyx/batch-timeout catalog-entry)
         pending-messages (atom {})
         drained?         (atom false)
+        read-timeout     (or (:redis/read-timeout-ms catalog-entry) 4000)
         k (:redis/key catalog-entry)
         op (or ((:redis/op catalog-entry) operations)
                (throw (Exception. (str "redis/op not found."))))
         conn             {:pool nil
                           :spec {:host (:redis/host catalog-entry)
                                  :port (:redis/port catalog-entry)
-                                 :read-timeout-ms batch-timeout}}]
+                                 :read-timeout-ms read-timeout}}]
     (->RedisConsumer max-pending batch-size batch-timeout
                      conn k pending-messages
                      drained?)))

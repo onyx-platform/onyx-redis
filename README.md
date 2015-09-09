@@ -95,6 +95,7 @@ Catalog entry:
  :redis/host "127.0.0.1"
  :redis/port 6379
  :redis/key ::your-key
+ :redis/read-timeout-ms <<optional-timeout>>
  :redis/op :lpop
  :onyx/batch-size batch-size
  :onyx/max-peers 1
@@ -119,6 +120,7 @@ Lifecycle entry:
 |`:redis/port`                 | `int`                | Redis port
 |`:redis/key`                  |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) or set containing segments
 |`:redis/op`                   |`keyword`             | A Redis datastructure operation (:lpop / :rpop/ :spop)
+|`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to read from Redis.
 
 #### Contributing
 
