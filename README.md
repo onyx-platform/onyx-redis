@@ -82,25 +82,34 @@ requests to be batched.
 
 Please see the Carmine documentation for examples for how to use Carmine.
 
-##### Read Sets from Redis Input Plugin
+##### Consume from Key Input Plugin
+
+Consumes from a redis set or list. 
+
+**NOTE** this plugin does not currently support any state recovery / check
+pointing. If a peer crashes any pending segments will be lost i.e. those that have been read
+from the set or list and are not fully acked.
 
 Catalog entry:
 
 ```clojure
 
 {:onyx/name :in-from-redis
- :onyx/plugin :onyx.plugin.redis/read-sets-from-redis
+ :onyx/plugin :onyx.plugin.redis/consumer
  :onyx/type :input
  :onyx/medium :redis
  :redis/host "127.0.0.1"
  :redis/port 6379
- :redis/keystore ::keystore
- :redis/step-size 5
+ :redis/key ::your-key
+ :redis/read-timeout-ms <<optional-timeout>>
+ :redis/op :lpop
  :onyx/batch-size batch-size
  :onyx/max-peers 1
  :onyx/doc "Reads segments via redis"}
 
 ```
+
+Currently supported `:redis/op` consume operations are `:lpop`, `:rpop`, and `:spop`.
 
 Lifecycle entry:
 
@@ -115,9 +124,9 @@ Lifecycle entry:
 |------------------------------|----------------------|------------
 |`:redis/host`                 | `string`             | Redis hostname
 |`:redis/port`                 | `int`                | Redis port
-|`:redis/keystore`             |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) containing each the keys of each set the plugin is concerned with
-|`:redis/step-size`            |`int`                 | The step granularity to batch requests to Redis. defaults to 10
-|`:redis/read-timeout-ms`      |`int`                 | Time to wait (in ms) before giving up on trying to read from Redis.
+|`:redis/key`                  |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) or set containing segments
+|`:redis/op`                   |`keyword`             | A Redis datastructure operation (:lpop / :rpop/ :spop)
+|`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to read from Redis.
 
 #### Contributing
 
