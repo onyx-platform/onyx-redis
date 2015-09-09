@@ -86,9 +86,9 @@ Please see the Carmine documentation for examples for how to use Carmine.
 
 Consumes from a redis set or list. 
 
-**NOTE** this plugin does not currently support any state recovery at all - if
-a peer crashes any pending segments (those that have been read from the set or
-list and are not fully acked) will be lost.
+**NOTE** this plugin does not currently support any state recovery / check
+pointing. If a peer crashes any pending segments will be lost i.e. those that have been read
+from the set or list and are not fully acked.
 
 Catalog entry:
 
