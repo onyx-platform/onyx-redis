@@ -7,9 +7,9 @@ set -o xtrace
 
 cd "$(dirname "$0")/.."
 
-current_version=`lein pprint :version`
 new_version=$1
 release_branch=$2
+current_version=`lein pprint :version`
 
 # Update to release version.
 git checkout master
