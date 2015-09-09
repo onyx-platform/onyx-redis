@@ -63,8 +63,9 @@
                              (car/ltrim keystore step -1))]
      keys)))
 
-(defn batch-load-records [conn keys]
+(defn batch-load-records 
   "Starts loading records"
+  [conn keys]
   (when-let [record-batch (wcar conn (mapv
                                       (fn [key]
                                         (car/parse (fn [set]
