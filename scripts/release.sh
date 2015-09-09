@@ -29,5 +29,5 @@ git push origin $release_branch
 # Prepare next release cycle.
 git checkout master
 lein set-version
-git commit -m "Prepare for next release cycle." project.clj
+git commit -m "Prepare for next release cycle." project.clj README.md
 git push origin master
