@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-redis "0.7.4-SNAPSHOT"
+(defproject org.onyxplatform/onyx-redis "0.7.5-SNAPSHOT"
   :description "Onyx plugin for redis"
   :url "https://github.com/onyx-platform/onyx-redis"
   :license {:name "Eclipse Public License"
@@ -19,6 +19,7 @@
   :profiles {:dev {:dependencies [[midje "1.7.0"]]
                    :plugins [[lein-midje "3.1.3"]
                              [lein-set-version "0.4.1"]
+                             [lein-update-dependency "0.1.2"]
                              [lein-pprint "1.1.1"]]}
              :circle-ci {:jvm-opts ["-Xmx4g"]}}
   :jvm-opts ["-XX:-OmitStackTraceInFastThrow"])
