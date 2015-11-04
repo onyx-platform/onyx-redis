@@ -76,7 +76,6 @@
 
    {:onyx/name :out-redis
     :onyx/plugin :onyx.plugin.redis/writer
-    :onyx/ident :redis/write
     :onyx/type :output
     :onyx/medium :redis
     :onyx/fn ::create-writes

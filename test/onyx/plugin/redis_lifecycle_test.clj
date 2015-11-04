@@ -62,7 +62,6 @@
 
    {:onyx/name :out
     :onyx/plugin :onyx.plugin.core-async/output
-    :onyx/ident :core.async/write-to-chan
     :onyx/type :output
     :onyx/medium :core.async
     :onyx/batch-size batch-size
