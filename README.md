@@ -42,7 +42,7 @@ Example:
 
 Segments should be supplied to the plugin in the form:
 ```clojure
-{:op :sadd :key redis-key :value redis-value}
+{:op :sadd :args [redis-key redis-value]}
 ```
 
 Where op is one of:

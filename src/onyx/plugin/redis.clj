@@ -48,7 +48,8 @@
           (doall 
             (map (fn [{:keys [message]}] 
                    (let [op ((:op message) operations)] 
-                     (op (:key message) (:value message)))) 
+                     (assert (:args message) "Redis expected format was changed to expect: {:op :operation :args [arg1, arg2, arg3]}")
+                     (apply op (:args message)))) 
                  (mapcat :leaves (:tree results)))))
     {})
   (seal-resource [_ _]

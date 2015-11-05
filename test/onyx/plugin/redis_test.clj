@@ -52,8 +52,7 @@
   (update (:value segment) :n inc))
 
 (defn create-writes [segment]
-  {:key ::store-out
-   :value segment
+  {:args [::store-out segment]
    :op :lpush})
 
 (def catalog
