@@ -32,7 +32,8 @@
 
 (def batch-size 8)
 
-(def redis-conn {:spec {:host "127.0.0.1"}})
+(def redis-uri "redis://127.0.0.1:6379")
+(def redis-conn {:spec {:uri redis-uri}})
 
 (def messages
   [{:op :sadd :args ["cyclists" {:name "John" :age 20}]}
@@ -73,8 +74,7 @@
     :onyx/plugin :onyx.plugin.redis/writer
     :onyx/type :output
     :onyx/medium :redis
-    :redis/host "127.0.0.1"
-    :redis/port 6379
+    :redis/uri redis-uri
     :onyx/batch-size batch-size}])
 
 (def workflow

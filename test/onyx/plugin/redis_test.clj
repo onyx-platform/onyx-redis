@@ -33,7 +33,9 @@
 
 (def batch-size 8)
 
-(def redis-conn {:spec {:host "127.0.0.1"}})
+(def redis-uri "redis://127.0.0.1:6379")
+
+(def redis-conn {:spec {:uri redis-uri}})
 
 (fact (wcar redis-conn
             (car/flushall)
@@ -60,8 +62,7 @@
     :onyx/plugin :onyx.plugin.redis/consumer
     :onyx/type :input
     :onyx/medium :redis
-    :redis/host "127.0.0.1"
-    :redis/port 6379
+    :redis/uri redis-uri
     :redis/key ::store
     :redis/op :lpop
     :onyx/batch-size batch-size
@@ -78,8 +79,7 @@
     :onyx/type :output
     :onyx/medium :redis
     :onyx/fn ::create-writes
-    :redis/host "127.0.0.1"
-    :redis/port 6379
+    :redis/uri redis-uri
     :onyx/batch-size batch-size}])
 
 (def workflow

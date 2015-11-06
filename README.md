@@ -27,8 +27,7 @@ Example:
  :onyx/plugin :onyx.plugin.redis/writer
  :onyx/type :output
  :onyx/medium :redis
- :redis/host "127.0.0.1"
- :redis/port 6379
+ :redis/uri "redis://127.0.0.1:6379"
  :onyx/batch-size batch-size}
 ```
 
@@ -36,8 +35,7 @@ Example:
 
 |key                           | type                 | description
 |------------------------------|----------------------|------------
-|`:redis/host`                 | `string`             | Redis hostname
-|`:redis/port`                 | `int`                | Redis port
+|`:redis/uri`                  | `string`             | Redis uri
 |`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to write to Redis.
 
 Segments should be supplied to the plugin in the form:
@@ -58,8 +56,7 @@ Injects an carmine connection spec into the event map. Will also inject as an :o
 ```clojure
 {:lifecycle/task :use-redis-task
  :lifecycle/calls :onyx.plugin.redis/reader-conn-spec
- :redis/host redis-hostname
- :redis/port redis-port
+ :redis/uri "redis://127.0.0.1:6379"
  :redis/read-timeout-ms <<optional-timeout>>
  :onyx/param? true
  :lifecycle/doc "Initialises redis conn spec into event map, or as a :onyx.core/param"}
@@ -98,8 +95,7 @@ Catalog entry:
  :onyx/plugin :onyx.plugin.redis/consumer
  :onyx/type :input
  :onyx/medium :redis
- :redis/host "127.0.0.1"
- :redis/port 6379
+ :redis/uri "redis://127.0.0.1:6379"
  :redis/key ::your-key
  :redis/read-timeout-ms <<optional-timeout>>
  :redis/op :lpop
@@ -122,8 +118,7 @@ Lifecycle entry:
 
 |key                           | type                 | description
 |------------------------------|----------------------|------------
-|`:redis/host`                 | `string`             | Redis hostname
-|`:redis/port`                 | `int`                | Redis port
+|`:redis/uri`                  | `string`             | Redis uri
 |`:redis/key`                  |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) or set containing segments
 |`:redis/op`                   |`keyword`             | A Redis datastructure operation (:lpop / :rpop/ :spop)
 |`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to read from Redis.
