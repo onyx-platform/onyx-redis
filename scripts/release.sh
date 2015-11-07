@@ -36,5 +36,7 @@ git push origin $release_branch
 # Prepare next release cycle.
 git checkout master
 lein set-version
+next_cycle=`lein pprint :version | sed s/\"//g`
+sed -i.bak "s/$new_version/$next_cycle/g" README.md
 git commit -m "Prepare for next release cycle." project.clj README.md
 git push origin master

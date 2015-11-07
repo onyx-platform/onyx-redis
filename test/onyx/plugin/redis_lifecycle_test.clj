@@ -32,8 +32,8 @@
 
 (def batch-size 8)
 
-(def redis-conn {:spec {:host "127.0.0.1"}})
-
+(def redis-uri "redis://127.0.0.1:6379")
+(def redis-conn {:spec {:uri redis-uri}})
 
 ;;;;; Load up the redis with test data
 ;;;;;
@@ -99,8 +99,7 @@
 
    {:lifecycle/task :lookup
     :lifecycle/calls :onyx.plugin.redis/reader-conn-spec
-    :redis/host "localhost"
-    :redis/port 6379
+    :redis/uri redis-uri
     :onyx/param? true
     :lifecycle/doc "Initialises redis conn spec into event map, or as a :onyx.core/param"}
 

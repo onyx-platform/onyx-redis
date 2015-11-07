@@ -19,12 +19,11 @@
 ;; Connection lifecycle code
 
 (defn inject-conn-spec [{:keys [onyx.core/params] :as event} 
-                         {:keys [onyx/param?
-                                 redis/host redis/port redis/read-timeout-ms] :as lifecycle}]
-  (when-not (and host port)
-    (throw (ex-info "Missing :redis/host or :redis/port in inject-redis-spec lifecyle." lifecycle)))
-  (let [conn {:spec {:host host 
-                     :port port 
+                        {:keys [onyx/param? redis/uri redis/read-timeout-ms] :as lifecycle}]
+
+   (when-not uri 
+      (throw (ex-info ":redis/uri must be supplied to output task." lifecycle)))
+  (let [conn {:spec {:uri uri 
                      :read-timeout-ms (or read-timeout-ms 4000)}}]
     {:onyx.core/params (if param?
                          (conj params conn)
@@ -48,7 +47,8 @@
           (doall 
             (map (fn [{:keys [message]}] 
                    (let [op ((:op message) operations)] 
-                     (op (:key message) (:value message)))) 
+                     (assert (:args message) "Redis expected format was changed to expect: {:op :operation :args [arg1, arg2, arg3]}")
+                     (apply op (:args message)))) 
                  (mapcat :leaves (:tree results)))))
     {})
   (seal-resource [_ _]
@@ -56,8 +56,10 @@
 
 (defn writer [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
-        conn          {:spec {:host (:redis/host catalog-entry)
-                              :port (:redis/port catalog-entry)
+        uri (:redis/uri catalog-entry)
+        _ (when-not uri 
+            (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
+        conn          {:spec {:uri uri
                               :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
                                                    4000)}}]
     (->RedisWriter conn)))
@@ -160,11 +162,13 @@
         drained?         (atom false)
         read-timeout     (or (:redis/read-timeout-ms catalog-entry) 4000)
         k (:redis/key catalog-entry)
+        uri (:redis/uri catalog-entry)
+        _ (when-not uri 
+            (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
         op (or ((:redis/op catalog-entry) operations)
                (throw (Exception. (str "redis/op not found."))))
         conn             {:pool nil
-                          :spec {:host (:redis/host catalog-entry)
-                                 :port (:redis/port catalog-entry)
+                          :spec {:uri uri 
                                  :read-timeout-ms read-timeout}}]
     (->RedisConsumer max-pending batch-size batch-timeout
                      conn k pending-messages
