@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.8.0-alpha5"]
+                 [org.onyxplatform/onyx "0.8.0-20151125_104900-gc0fd118"]
                  [com.taoensso/carmine "2.12.0" :exclusions [com.taoensso/timbre com.taoensso/encore]]]
   :profiles {:dev {:dependencies [[midje "1.7.0"]]
                    :plugins [[lein-midje "3.1.3"]
