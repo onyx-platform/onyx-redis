@@ -4,6 +4,7 @@
             [onyx.static.default-vals :refer [arg-or-default]]
             [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
                                         >!! >! <!! <! chan] :as async]
+            [onyx.static.uuid :refer [random-uuid]]
             [taoensso.timbre :refer [info]]
             [onyx.types :as t]
             [onyx.peer.function]
@@ -113,10 +114,10 @@
           max-segments (min (- max-pending pending) batch-size)
           batch (keep (fn [v]
                        (cond (= v "done") 
-                             (t/input (java.util.UUID/randomUUID)
+                             (t/input (random-uuid)
                                       :done)
                              v
-                             (t/input (java.util.UUID/randomUUID)
+                             (t/input (random-uuid)
                                       {:key k
                                        :value v}))) 
                      (take-from-redis conn k batch-size batch-timeout))]
