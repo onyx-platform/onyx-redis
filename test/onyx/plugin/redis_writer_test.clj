@@ -1,5 +1,6 @@
 (ns onyx.plugin.redis-writer-test
-  (:require [onyx.peer.pipeline-extensions :as p-ext]
+  (:require [clojure.string :as s]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.plugin.redis :refer :all]
             [clojure.core.async :refer [chan go-loop >!! <!! <! close!]]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -9,15 +10,16 @@
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
+(def zkAddress ["127.0.0.1" 2188])
 
 (def env-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address (s/join ":" zkAddress)
    :zookeeper/server? true
-   :zookeeper.server/port 2188
+   :zookeeper.server/port (second zkAddress)
    :onyx/id id})
 
 (def peer-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address (s/join ":" zkAddress)
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.messaging/impl :aeron
    :onyx.messaging/peer-port 40200
@@ -35,12 +37,16 @@
 (def redis-uri "redis://127.0.0.1:6379")
 (def redis-conn {:spec {:uri redis-uri}})
 
+(def hll-counter "hll_counter")
+
 (def messages
   [{:op :sadd :args ["cyclists" {:name "John" :age 20}]}
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
    {:op :sadd :args ["cyclists" {:name "Jane" :age 25}]}
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
-   :done]) 
+   {:op :pfadd :args [hll-counter 1]}
+   {:op :pfadd :args [hll-counter 2]}
+   :done])
 
 (def in-chan (chan (count messages)))
 
@@ -100,15 +106,20 @@
 
 (onyx.api/shutdown-env env)
 
-(fact (sort-by :name 
+(fact (sort-by :name
                (car/wcar redis-conn
                          (set (car/smembers "cyclists"))))
-      => 
+      =>
       [{:name "Jane" :age 25}
        {:name "John" :age 20}])
 
-(fact (sort-by :name 
+(fact (sort-by :name
                (car/wcar redis-conn
                          (set (car/smembers "runners"))))
-      => 
+      =>
       [{:name "Mike" :age 24}])
+
+(fact (car/wcar redis-conn (car/pfcount hll-counter))
+      =>
+      2
+      )

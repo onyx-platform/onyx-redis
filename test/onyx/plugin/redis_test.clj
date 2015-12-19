@@ -1,5 +1,6 @@
 (ns onyx.plugin.redis-test
-  (:require [onyx.peer.pipeline-extensions :as p-ext]
+  (:require [clojure.string :as s]
+            [onyx.peer.pipeline-extensions :as p-ext]
             [onyx.plugin.redis :refer :all]
             [clojure.core.async :refer [chan go-loop >!! <!! <!]]
             [onyx.plugin.core-async :refer [take-segments!]]
@@ -10,15 +11,16 @@
             [onyx.api]))
 
 (def id (java.util.UUID/randomUUID))
+(def zkAddress ["127.0.0.1" 2188])
 
 (def env-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address (s/join ":" zkAddress)
    :zookeeper/server? true
-   :zookeeper.server/port 2188
+   :zookeeper.server/port (second zkAddress)
    :onyx/id id})
 
 (def peer-config
-  {:zookeeper/address "127.0.0.1:2188"
+  {:zookeeper/address (s/join ":" zkAddress)
    :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
    :onyx.messaging/impl :aeron
    :onyx.messaging/peer-port 40200
@@ -120,10 +122,10 @@
 
 (onyx.api/shutdown-env env)
 
-(let [vs (sort-by :n 
+(let [vs (sort-by :n
                   (wcar redis-conn
                         (car/lrange ::store-out 0 100000)))]
-  (fact vs => 
+  (fact vs =>
         (map (fn [v]
                {:n (inc v)})
              (range n-messages))))

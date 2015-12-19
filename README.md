@@ -45,7 +45,7 @@ Segments should be supplied to the plugin in the form:
 
 Where op is one of:
 ```
-:sadd, :zadd, :lpush, :set
+:sadd, :zadd, :lpush, :set, :pfadd
 ```
 These correspond to their equivalent calls in carmine, see [documentation] (http://ptaoussanis.github.io/carmine/).
 
@@ -81,7 +81,7 @@ Please see the Carmine documentation for examples for how to use Carmine.
 
 ##### Consume from Key Input Plugin
 
-Consumes from a redis set or list. 
+Consumes from a redis set or list.
 
 **NOTE** this plugin does not currently support any state recovery / check
 pointing. If a peer crashes any pending segments will be lost i.e. those that have been read
