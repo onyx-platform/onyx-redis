@@ -11,20 +11,20 @@
             [taoensso.carmine.connections]))
 
 
-(defrecord Ops [sadd lpush zadd set lpop spop rpop])
+(defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd])
 
-(def operations 
-  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop))
+(def operations
+  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop car/pfcount car/pfadd))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
 
-(defn inject-conn-spec [{:keys [onyx.core/params] :as event} 
+(defn inject-conn-spec [{:keys [onyx.core/params] :as event}
                         {:keys [onyx/param? redis/uri redis/read-timeout-ms] :as lifecycle}]
 
-   (when-not uri 
+   (when-not uri
       (throw (ex-info ":redis/uri must be supplied to output task." lifecycle)))
-  (let [conn {:spec {:uri uri 
+  (let [conn {:spec {:uri uri
                      :read-timeout-ms (or read-timeout-ms 4000)}}]
     {:onyx.core/params (if param?
                          (conj params conn)
@@ -44,12 +44,12 @@
     (onyx.peer.function/read-batch event))
 
   (write-batch [_ {:keys [onyx.core/results]}]
-    (wcar conn 
-          (doall 
-            (map (fn [{:keys [message]}] 
-                   (let [op ((:op message) operations)] 
+    (wcar conn
+          (doall
+            (map (fn [{:keys [message]}]
+                   (let [op ((:op message) operations)]
                      (assert (:args message) "Redis expected format was changed to expect: {:op :operation :args [arg1, arg2, arg3]}")
-                     (apply op (:args message)))) 
+                     (apply op (:args message))))
                  (mapcat :leaves (:tree results)))))
     {})
   (seal-resource [_ _]
@@ -58,7 +58,7 @@
 (defn writer [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
         uri (:redis/uri catalog-entry)
-        _ (when-not uri 
+        _ (when-not uri
             (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
         conn          {:spec {:uri uri
                               :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
@@ -73,7 +73,7 @@
         task     (:onyx.core/task-map event)]
     (when (> (:onyx/max-peers task) 1)
       (throw (Exception. "Onyx-Redis can not run with :onyx/max-peers greater than 1")))
-    {:redis/conn             (:conn pipeline) 
+    {:redis/conn             (:conn pipeline)
      :redis/drained?         (:drained? pipeline)
      :redis/pending-messages (:pending-messages pipeline)}))
 
@@ -95,12 +95,12 @@
   (let [end (+ timeout (System/currentTimeMillis))]
     (loop [return []]
       (if (and (< (System/currentTimeMillis) end)
-               (< (count return) batch-size)) 
+               (< (count return) batch-size))
         (let [vs (wcar conn
                        (doall (map (fn [_]
                                      (car/lpop k))
                                    (range (- batch-size (count return))))))]
-              (recur (into return vs))) 
+              (recur (into return vs)))
         return))))
 
 (defrecord RedisConsumer [max-pending batch-size batch-timeout conn k pending-messages drained?]
@@ -113,13 +113,13 @@
     (let [pending (count @pending-messages)
           max-segments (min (- max-pending pending) batch-size)
           batch (keep (fn [v]
-                       (cond (= v "done") 
+                       (cond (= v "done")
                              (t/input (random-uuid)
                                       :done)
                              v
                              (t/input (random-uuid)
                                       {:key k
-                                       :value v}))) 
+                                       :value v})))
                      (take-from-redis conn k batch-size batch-timeout))]
       (if (and (all-done? (vals @pending-messages))
                (all-done? batch)
@@ -142,7 +142,7 @@
   (retry-segment
     [_ _ segment-id]
     (when-let [msg (get @pending-messages segment-id)]
-      (wcar conn 
+      (wcar conn
             (car/lpush k (:message msg)))
       (swap! pending-messages dissoc segment-id)))
 
@@ -164,12 +164,12 @@
         read-timeout     (or (:redis/read-timeout-ms catalog-entry) 4000)
         k (:redis/key catalog-entry)
         uri (:redis/uri catalog-entry)
-        _ (when-not uri 
+        _ (when-not uri
             (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
         op (or ((:redis/op catalog-entry) operations)
                (throw (Exception. (str "redis/op not found."))))
         conn             {:pool nil
-                          :spec {:uri uri 
+                          :spec {:uri uri
                                  :read-timeout-ms read-timeout}}]
     (->RedisConsumer max-pending batch-size batch-timeout
                      conn k pending-messages
