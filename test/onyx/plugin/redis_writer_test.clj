@@ -16,7 +16,7 @@
   {:zookeeper/address (s/join ":" zkAddress)
    :zookeeper/server? true
    :zookeeper.server/port (second zkAddress)
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def peer-config
   {:zookeeper/address (s/join ":" zkAddress)
@@ -24,7 +24,7 @@
    :onyx.messaging/impl :aeron
    :onyx.messaging/peer-port 40200
    :onyx.messaging/bind-addr "localhost"
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def env (onyx.api/start-env env-config))
 
