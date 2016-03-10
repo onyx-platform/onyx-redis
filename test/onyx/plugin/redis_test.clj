@@ -1,57 +1,34 @@
 (ns onyx.plugin.redis-test
-  (:require [clojure.string :as s]
-            [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.plugin.redis :refer :all]
-            [clojure.core.async :refer [chan go-loop >!! <!! <!]]
-            [onyx.plugin.core-async :refer [take-segments!]]
-            [midje.sweet :refer :all]
-            [taoensso.timbre :refer [info]]
+  (:require [aero.core :refer [read-config]]
             [taoensso.carmine :as car :refer [wcar]]
-            [clojure.core.async :as async :refer [chan <!! >!!]]
-            [onyx.api]))
+            [clojure.test :refer [deftest is]]
+            [onyx api
+             [job :refer [add-task]]
+             [test-helper :refer [with-test-env]]]
+            [onyx.redis.tasks :as redis]
+            [onyx.plugin
+             [core-async :refer [take-segments!]]
+             [core-async-tasks :as core-async]
+             [redis]]))
 
-(def id (java.util.UUID/randomUUID))
-(def zkAddress ["127.0.0.1" 2188])
+(defn build-job [redis-uri batch-size batch-timeout]
+  (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
+        base-job (merge {:workflow [[:in :inc]
+                                    [:inc :out]]
+                         :catalog [{:onyx/name :inc
+                                    :onyx/fn ::my-inc
+                                    :onyx/type :function
+                                    :onyx/batch-size batch-size}]
+                         :lifecycles []
+                         :windows []
+                         :triggers []
+                         :flow-conditions []
+                         :task-scheduler :onyx.task-scheduler/balanced})]
+    (-> base-job
+        (add-task (redis/reader :in redis-uri ::store :lpop batch-settings))
+        (add-task (redis/writer :out redis-uri (merge {:onyx/fn ::create-writes}
+                                                      batch-settings))))))
 
-(def env-config
-  {:zookeeper/address (s/join ":" zkAddress)
-   :zookeeper/server? true
-   :zookeeper.server/port (second zkAddress)
-   :onyx/id id})
-
-(def peer-config
-  {:zookeeper/address (s/join ":" zkAddress)
-   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :aeron
-   :onyx.messaging/peer-port 40200
-   :onyx.messaging/bind-addr "localhost"
-   :onyx/id id})
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
-(def n-messages (rand-int 1000))
-
-(def batch-size 8)
-
-(def redis-uri "redis://127.0.0.1:6379")
-
-(def redis-conn {:spec {:uri redis-uri}})
-
-(fact (wcar redis-conn
-            (car/flushall)
-            (car/flushdb)) => ["OK" "OK"])
-
-(wcar redis-conn
-      (mapv (fn [n]
-             (car/lpush ::store {:n n}))
-           (range n-messages))
-      (car/lpush ::store :done))
-
-;;;;;
-;;;;;
-;;;;;
 (defn my-inc [segment]
   (update (:value segment) :n inc))
 
@@ -59,77 +36,35 @@
   {:args [::store-out segment]
    :op :lpush})
 
-(def catalog
-  [{:onyx/name :in
-    :onyx/plugin :onyx.plugin.redis/consumer
-    :onyx/type :input
-    :onyx/medium :redis
-    :redis/uri redis-uri
-    :redis/key ::store
-    :redis/op :lpop
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments via redis"}
+(defn ensure-redis! [redis-conn]
+  (wcar redis-conn
+        (car/flushall)
+        (car/flushdb)
+        (mapv (fn [n]
+                (car/lpush ::store {:n n}))
+              (range 100))
+        (car/lpush ::store :done)))
 
-   {:onyx/name :inc
-    :onyx/fn ::my-inc
-    :onyx/type :function
-    :onyx/batch-size batch-size}
-
-   {:onyx/name :out-redis
-    :onyx/plugin :onyx.plugin.redis/writer
-    :onyx/type :output
-    :onyx/medium :redis
-    :onyx/fn ::create-writes
-    :redis/uri redis-uri
-    :onyx/batch-size batch-size}])
-
-(def workflow
-  [[:in :inc]
-   [:inc :out-redis]])
-
-(def out-chan (async/chan 1000))
-
-(defn inject-writer-ch [event lifecycle]
-  {:core.async/chan out-chan})
-
-(def out-lifecycle
-  {:lifecycle/before-task-start inject-writer-ch})
-
-(def lifecycles
-  [{:lifecycle/task :in
-    :lifecycle/calls :onyx.plugin.redis/reader-state-calls}])
-
-(def v-peers (onyx.api/start-peers 3 peer-group))
-
-(def job-id
-  (:job-id
-   (onyx.api/submit-job
-    peer-config
-    {:catalog catalog
-     :workflow workflow
-     :lifecycles lifecycles
-     :task-scheduler :onyx.task-scheduler/balanced})))
-
-(onyx.api/await-job-completion peer-config job-id)
-
-(Thread/sleep 10000)
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
-
-(onyx.api/shutdown-env env)
-
-(let [vs (sort-by :n
-                  (wcar redis-conn
-                        (car/lrange ::store-out 0 100000)))]
-  (fact vs =>
-        (map (fn [v]
-               {:n (inc v)})
-             (range n-messages))))
-
-(fact (wcar redis-conn
-            (car/flushall)
-            (car/flushdb)) => ["OK" "OK"])
+(deftest redis-plugin-general-test
+  (let [{:keys [env-config
+                peer-config
+                redis-config]} (read-config (clojure.java.io/resource "config.edn") {:profile :test})
+        redis-uri (get redis-config :redis/uri)
+        job (build-job redis-uri 10 1000)
+        redis-conn {:spec {:uri redis-uri}}]
+    (try
+      (with-test-env [test-env [3 env-config peer-config]]
+        (ensure-redis! redis-conn)
+        (onyx.test-helper/validate-enough-peers! test-env job)
+        (->> (:job-id (onyx.api/submit-job peer-config job))
+             (onyx.api/await-job-completion peer-config))
+        (let [vs (sort-by :n
+                          (wcar redis-conn
+                                (car/lrange ::store-out 0 100000)))]
+          (is (= vs
+                 (map (fn [v]
+                        {:n (inc v)})
+                      (range 100))))))
+      (finally (wcar redis-conn
+                     (car/flushall)
+                     (car/flushdb))))))

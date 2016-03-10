@@ -1,12 +1,13 @@
 (ns onyx.plugin.redis-lifecycle-test
   (:require [aero.core :refer [read-config]]
+            [taoensso.carmine :as car :refer [wcar]]
             [clojure.test :refer [deftest is]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.core.async :refer [pipe]]
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.redis.tasks :refer [redis-connected-task]]
+            [onyx.redis.tasks :refer [connected-task]]
             [onyx.plugin
              [core-async :refer [take-segments!]]
              [core-async-tasks :as core-async]
@@ -24,7 +25,7 @@
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
         (add-task (core-async/input-task :in batch-settings))
-        (add-task (redis-connected-task :lookup ::my-lookup redis-uri batch-settings))
+        (add-task (connected-task :lookup ::my-lookup redis-uri batch-settings))
         (add-task (core-async/output-task :out batch-settings)))))
 
 (defn my-lookup [conn segment]

@@ -111,6 +111,7 @@
   (read-batch [_ event]
     (let [pending (count @pending-messages)
           max-segments (min (- max-pending pending) batch-size)
+
           batch (keep (fn [v]
                        (cond (= v "done")
                              (t/input (random-uuid)
