@@ -1,6 +1,7 @@
 (ns onyx.plugin.redis-writer-test
   (:require [aero.core :refer [read-config]]
             [taoensso.carmine :as car :refer [wcar]]
+<<<<<<< HEAD
             [clojure.test :refer [deftest is]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.core.async :refer [pipe]]
