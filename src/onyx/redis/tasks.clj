@@ -2,23 +2,6 @@
   (:require [schema.core :as s]
             [onyx.schema :as os]))
 
-                                        ;   (s/defn ^:always-validate <BLA>
-;;     ([task-name :- s/Keyword opts]
-;;      {:task {:task-map (merge {:onyx/name task-name
-;;                                :onyx/plugin
-;;                                :onyx/type :input
-;;                                :onyx/medium :datomic
-;;                                :onyx/doc "Reads messages from a Kafka topic"}
-;;                               opts)
-;;              :lifecycles [{:lifecycle/task task-name
-;;                            :lifecycle/calls }]}
-;;       :schema {:task-map
-;;                :lifecycles [os/Lifecycle]}})
-;;     ([task-name :- s/Keyword
-;;       task-opts :- {s/Any s/Any}]
-;;      (<BLA> task-name (merge {}
-;;                              task-opts))))
-
 (def UserTaskMapKey
   (os/build-allowed-key-ns :redis))
 
