@@ -24,4 +24,6 @@
   :onyx.messaging/peer-port              40200
   :onyx.messaging.aeron/embedded-driver? #cond {:default false
                                                 :test true}
-  :onyx.messaging/backpressure-strategy :high-restart-latency}}
+  :onyx.messaging/backpressure-strategy :high-restart-latency}
+ :redis-config
+ {:redis/uri "redis://192.168.99.100:6379"}}

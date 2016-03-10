@@ -43,7 +43,7 @@
     kw-fn :- s/Keyword
     uri :- s/Str
     task-opts :- {s/Any s/Any}]
-   (redis-connection-arg task-name (merge {:onyx/fn kw-fn
-                                           :onyx/param? true
+   (redis-connected-task task-name (merge {:onyx/fn kw-fn
+                                           :redis/param? true
                                            :redis/uri uri}
                                           task-opts))))
