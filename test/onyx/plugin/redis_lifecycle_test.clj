@@ -16,7 +16,7 @@
   {:zookeeper/address (s/join ":" zkAddress)
    :zookeeper/server? true
    :zookeeper.server/port (second zkAddress)
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def peer-config
   {:zookeeper/address (s/join ":" zkAddress)
@@ -24,7 +24,7 @@
    :onyx.messaging/impl :aeron
    :onyx.messaging/peer-port 40200
    :onyx.messaging/bind-addr "localhost"
-   :onyx/id id})
+   :onyx/tenancy-id id})
 
 (def env (onyx.api/start-env env-config))
 
@@ -34,7 +34,7 @@
 
 (def batch-size 8)
 
-(def redis-uri "redis://127.0.0.1:6379")
+  (def redis-uri "redis://192.168.99.100:6379")
 (def redis-conn {:spec {:uri redis-uri}})
 
 ;;;;; Load up the redis with test data
@@ -61,6 +61,8 @@
 
    {:onyx/name :lookup
     :onyx/fn ::my-lookup
+    :redis/uri redis-uri
+    :redis/param? true
     :onyx/type :function
     :onyx/batch-size batch-size}
 
@@ -103,8 +105,7 @@
 
    {:lifecycle/task :lookup
     :lifecycle/calls :onyx.plugin.redis/reader-conn-spec
-    :redis/uri redis-uri
-    :onyx/param? true
+
     :lifecycle/doc "Initialises redis conn spec into event map, or as a :onyx.core/param"}
 
    {:lifecycle/task :out
@@ -140,5 +141,3 @@
 (fact (wcar redis-conn
             (car/flushall)
             (car/flushdb)) => ["OK" "OK"])
-
-

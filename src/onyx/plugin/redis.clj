@@ -19,14 +19,13 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
 
-(defn inject-conn-spec [{:keys [onyx.core/params] :as event}
-                        {:keys [onyx/param? redis/uri redis/read-timeout-ms] :as lifecycle}]
-
-   (when-not uri
+(defn inject-conn-spec [{:keys [onyx.core/params onyx.core/task-map] :as event}
+                        {:keys [redis/param? redis/uri redis/read-timeout-ms] :as lifecycle}]
+  (when-not (or uri (:redis/uri task-map))
       (throw (ex-info ":redis/uri must be supplied to output task." lifecycle)))
-  (let [conn {:spec {:uri uri
+  (let [conn {:spec {:uri (or (:redis/uri task-map) uri)
                      :read-timeout-ms (or read-timeout-ms 4000)}}]
-    {:onyx.core/params (if param?
+    {:onyx.core/params (if (or (:redis/param? task-map) param?)
                          (conj params conn)
                          params)
      :redis/conn conn}))
@@ -84,7 +83,7 @@
 (defn take-from-redis
   "conn: Carmine map for connecting to redis
   key: The name of a redis key for looking up the relevant values
-  batch-size: The maximum size of a returned batch
+  batch-size: The maximum size of a returned batchs
   timeout: stop processing new collections after `timeout`/ms''
 
   In order to stay consistent in Redis list consumption, this function will
