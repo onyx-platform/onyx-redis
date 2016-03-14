@@ -1,15 +1,11 @@
 (ns onyx.plugin.redis-test
   (:require [aero.core :refer [read-config]]
-            [taoensso.carmine :as car :refer [wcar]]
             [clojure.test :refer [deftest is]]
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.redis.tasks :as redis]
-            [onyx.plugin
-             [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
-             [redis]]))
+            [onyx.tasks.redis :as redis]
+            [taoensso.carmine :as car :refer [wcar]]))
 
 (defn build-job [redis-uri batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}

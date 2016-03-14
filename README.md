@@ -92,7 +92,7 @@ Catalog entry:
 ```clojure
 
 {:onyx/name :in-from-redis
- :onyx/plugin :onyx.plugin.redis/consumer
+ :onyx/plugin :onyx.plugin.redis/reader
  :onyx/type :input
  :onyx/medium :redis
  :redis/uri "redis://127.0.0.1:6379"

@@ -1,17 +1,16 @@
 (ns onyx.plugin.redis-lifecycle-test
   (:require [aero.core :refer [read-config]]
-            [taoensso.carmine :as car :refer [wcar]]
-            [clojure.test :refer [deftest is]]
-            [clojure.core.async.lab :refer [spool]]
             [clojure.core.async :refer [pipe]]
+            [clojure.core.async.lab :refer [spool]]
+            [clojure.test :refer [deftest is]]
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.redis.tasks :refer [connected-task]]
             [onyx.plugin
              [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
-             [redis]]))
+             [core-async-tasks :as core-async]]
+            [onyx.tasks.redis :refer [connected-task]]
+            [taoensso.carmine :as car :refer [wcar]]))
 
 (defn build-job [redis-uri batch-size batch-timeout]
   (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
@@ -31,9 +30,7 @@
 (defn my-lookup [conn segment]
   {:results (wcar conn
                   (car/lrange (:key segment) 0 1000))})
-;;;;; Load up the redis with test data
-;;;;;
-;;;;;
+
 (defn ensure-redis! [redis-conn]
   (doseq [n (range 100)]
     (wcar redis-conn

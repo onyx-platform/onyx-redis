@@ -1,17 +1,14 @@
 (ns onyx.plugin.redis-writer-test
   (:require [aero.core :refer [read-config]]
-            [taoensso.carmine :as car :refer [wcar]]
-            [clojure.test :refer [deftest is]]
-            [clojure.core.async.lab :refer [spool]]
             [clojure.core.async :refer [pipe]]
+            [clojure.core.async.lab :refer [spool]]
+            [clojure.test :refer [deftest is]]
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.redis.tasks :as redis]
-            [onyx.plugin
-             [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
-             [redis]]))
+            [onyx.plugin.core-async-tasks :as core-async]
+            [onyx.tasks.redis :as redis]
+            [taoensso.carmine :as car :refer [wcar]]))
 
 (defn sample-data [hll-counter]
   [{:op :sadd :args ["cyclists" {:name "John" :age 20}]}

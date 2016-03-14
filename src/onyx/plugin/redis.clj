@@ -1,15 +1,12 @@
 (ns onyx.plugin.redis
-  (:require [onyx.peer.pipeline-extensions :as p-ext]
-            [taoensso.carmine :as car :refer (wcar)]
-            [onyx.static.default-vals :refer [arg-or-default]]
-            [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
-                                        >!! >! <!! <! chan] :as async]
-            [onyx.static.uuid :refer [random-uuid]]
-            [taoensso.timbre :refer [info]]
+  (:require [clojure.core.async :as async :refer [timeout]]
+            [onyx.peer function
+             [pipeline-extensions :as p-ext]]
+            [onyx.static
+             [default-vals :refer [arg-or-default]]
+             [uuid :refer [random-uuid]]]
             [onyx.types :as t]
-            [onyx.peer.function]
-            [taoensso.carmine.connections]))
-
+            [taoensso.carmine :as car :refer [wcar]]))
 
 (defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd])
 
@@ -102,7 +99,7 @@
               (recur (into return vs)))
         return))))
 
-(defrecord RedisConsumer [max-pending batch-size batch-timeout conn k pending-messages drained?]
+(defrecord RedisReader [max-pending batch-size batch-timeout conn k pending-messages drained?]
   p-ext/Pipeline
   p-ext/PipelineInput
   (write-batch [this event]
@@ -154,7 +151,7 @@
     [_ event]
     @drained?))
 
-(defn consumer [pipeline-data]
+(defn reader [pipeline-data]
   (let [catalog-entry    (:onyx.core/task-map pipeline-data)
         max-pending      (arg-or-default :onyx/max-pending catalog-entry)
         batch-size       (:onyx/batch-size catalog-entry)
@@ -171,7 +168,7 @@
         conn             {:pool nil
                           :spec {:uri uri
                                  :read-timeout-ms read-timeout}}]
-    (->RedisConsumer max-pending batch-size batch-timeout
+    (->RedisReader max-pending batch-size batch-timeout
                      conn k pending-messages
                      drained?)))
 
