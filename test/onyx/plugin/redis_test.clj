@@ -5,6 +5,7 @@
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.tasks.redis :as redis]
+            [onyx.plugin.redis]
             [taoensso.carmine :as car :refer [wcar]]))
 
 (defn build-job [redis-uri batch-size batch-timeout]

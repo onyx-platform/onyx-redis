@@ -7,6 +7,7 @@
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.plugin.core-async-tasks :as core-async]
+            [onyx.plugin.redis]
             [onyx.tasks.redis :as redis]
             [taoensso.carmine :as car :refer [wcar]]))
 

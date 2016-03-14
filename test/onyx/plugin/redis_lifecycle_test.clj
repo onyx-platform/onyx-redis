@@ -8,7 +8,8 @@
              [test-helper :refer [with-test-env]]]
             [onyx.plugin
              [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]]
+             [core-async-tasks :as core-async]
+             [redis]]
             [onyx.tasks.redis :refer [connected-task]]
             [taoensso.carmine :as car :refer [wcar]]))
 
@@ -38,9 +39,8 @@
           (car/pfadd ::hll_some-key n))))
 
 (deftest redis-lifecycle-injection-test
-  (let [{:keys [env-config
-                peer-config
-                redis-config]} (read-config (clojure.java.io/resource "config.edn") {:profile :test})
+  (let [{:keys [env-config peer-config redis-config]}
+        (read-config (clojure.java.io/resource "config.edn") {:profile :test})
         redis-uri (get redis-config :redis/uri)
         job (build-job redis-uri 10 1000)
         {:keys [in out]} (core-async/get-core-async-channels job)
