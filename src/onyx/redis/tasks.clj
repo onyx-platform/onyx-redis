@@ -5,12 +5,6 @@
 (def UserTaskMapKey
   (os/build-allowed-key-ns :redis))
 
-(def DatomicReadLogTaskMap
-  (s/->Both [os/TaskMap
-             {:datomic/uri
-              (s/optional-key :onyx/n-peers)
-              UserTaskMapKey s/Any}]))
-
 (s/defn ^:always-validate connected-task
   "Creates a redis connected task, where the first argument
    to the function located at kw-fn is a redis(carmine) connection"
