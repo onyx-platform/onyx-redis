@@ -6,9 +6,12 @@
             [onyx api
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
-            [onyx.plugin.core-async-tasks :as core-async]
-            [onyx.plugin.redis]
-            [onyx.tasks.redis :as redis]
+            [onyx.plugin
+             [redis]
+             [core-async :refer [get-core-async-channels]]]
+            [onyx.tasks
+             [core-async :as core-async]
+             [redis :as redis]]
             [taoensso.carmine :as car :refer [wcar]]))
 
 (defn sample-data [hll-counter]
@@ -34,7 +37,7 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (core-async/input-task :in batch-settings))
+        (add-task (core-async/input :in batch-settings))
         (add-task (redis/writer :out redis-uri batch-settings)))))
 
 (deftest redis-writer-test
@@ -43,7 +46,7 @@
                 redis-config]} (read-config (clojure.java.io/resource "config.edn") {:profile :test})
         redis-uri (get redis-config :redis/uri)
         job (build-job redis-uri 10 1000)
-        {:keys [in]}(core-async/get-core-async-channels job)
+        {:keys [in]}(get-core-async-channels job)
         redis-conn {:spec {:uri redis-uri}}
         hll-counter "hll_counter"
         messages (sample-data hll-counter)]

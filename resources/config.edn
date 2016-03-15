@@ -26,4 +26,4 @@
                                                 :test true}
   :onyx.messaging/backpressure-strategy :high-restart-latency}
  :redis-config
- {:redis/uri "redis://127.0.0.1:6379"}}
+ {:redis/uri "redis://192.168.99.100:6379"}}

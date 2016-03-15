@@ -7,10 +7,11 @@
              [job :refer [add-task]]
              [test-helper :refer [with-test-env]]]
             [onyx.plugin
-             [core-async :refer [take-segments!]]
-             [core-async-tasks :as core-async]
+             [core-async :refer [get-core-async-channels take-segments!]]
              [redis]]
-            [onyx.tasks.redis :refer [connected-task]]
+            [onyx.tasks
+             [core-async :as core-async]
+             [redis :refer [connected-task]]]
             [taoensso.carmine :as car :refer [wcar]]))
 
 (defn build-job [redis-uri batch-size batch-timeout]
@@ -24,9 +25,9 @@
                          :flow-conditions []
                          :task-scheduler :onyx.task-scheduler/balanced})]
     (-> base-job
-        (add-task (core-async/input-task :in batch-settings))
+        (add-task (core-async/input :in batch-settings))
         (add-task (connected-task :lookup ::my-lookup redis-uri batch-settings))
-        (add-task (core-async/output-task :out batch-settings)))))
+        (add-task (core-async/output :out batch-settings)))))
 
 (defn my-lookup [conn segment]
   {:results (wcar conn
@@ -43,7 +44,7 @@
         (read-config (clojure.java.io/resource "config.edn") {:profile :test})
         redis-uri (get redis-config :redis/uri)
         job (build-job redis-uri 10 1000)
-        {:keys [in out]} (core-async/get-core-async-channels job)
+        {:keys [in out]} (get-core-async-channels job)
         redis-conn {:spec {:uri redis-uri}}]
     (try
       (with-test-env [test-env [3 env-config peer-config]]
