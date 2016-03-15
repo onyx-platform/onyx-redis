@@ -1,45 +1,20 @@
 (ns onyx.plugin.redis-writer-test
-  (:require [clojure.string :as s]
-            [onyx.peer.pipeline-extensions :as p-ext]
-            [onyx.plugin.redis :refer :all]
-            [clojure.core.async :refer [chan go-loop >!! <!! <! close!]]
-            [onyx.plugin.core-async :refer [take-segments!]]
-            [midje.sweet :refer :all]
-            [taoensso.carmine :as car :refer [wcar]]
-            [clojure.core.async :as async :refer [chan <!! >!!]]
-            [onyx.api]))
+  (:require [aero.core :refer [read-config]]
+            [clojure.core.async :refer [pipe]]
+            [clojure.core.async.lab :refer [spool]]
+            [clojure.test :refer [deftest is]]
+            [onyx api
+             [job :refer [add-task]]
+             [test-helper :refer [with-test-env]]]
+            [onyx.plugin
+             [redis]
+             [core-async :refer [get-core-async-channels]]]
+            [onyx.tasks
+             [core-async :as core-async]
+             [redis :as redis]]
+            [taoensso.carmine :as car :refer [wcar]]))
 
-(def id (java.util.UUID/randomUUID))
-(def zkAddress ["127.0.0.1" 2188])
-
-(def env-config
-  {:zookeeper/address (s/join ":" zkAddress)
-   :zookeeper/server? true
-   :zookeeper.server/port (second zkAddress)
-   :onyx/tenancy-id id})
-
-(def peer-config
-  {:zookeeper/address (s/join ":" zkAddress)
-   :onyx.peer/job-scheduler :onyx.job-scheduler/greedy
-   :onyx.messaging/impl :aeron
-   :onyx.messaging/peer-port 40200
-   :onyx.messaging/bind-addr "localhost"
-   :onyx/tenancy-id id})
-
-(def env (onyx.api/start-env env-config))
-
-(def peer-group (onyx.api/start-peer-group peer-config))
-
-(def n-messages (rand-int 1000))
-
-(def batch-size 8)
-
-(def redis-uri "redis://127.0.0.1:6379")
-(def redis-conn {:spec {:uri redis-uri}})
-
-(def hll-counter "hll_counter")
-
-(def messages
+(defn sample-data [hll-counter]
   [{:op :sadd :args ["cyclists" {:name "John" :age 20}]}
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
    {:op :sadd :args ["cyclists" {:name "Jane" :age 25}]}
@@ -48,78 +23,50 @@
    {:op :pfadd :args [hll-counter 2]}
    :done])
 
-(def in-chan (chan (count messages)))
+(defn build-job [redis-uri batch-size batch-timeout]
+  (let [batch-settings {:onyx/batch-size batch-size :onyx/batch-timeout batch-timeout}
+        base-job (merge {:workflow [[:in :out]
+                                    ]
+                         :catalog [{:onyx/name :inc
+                                    :onyx/fn ::my-inc
+                                    :onyx/type :function
+                                    :onyx/batch-size batch-size}]
+                         :lifecycles []
+                         :windows []
+                         :triggers []
+                         :flow-conditions []
+                         :task-scheduler :onyx.task-scheduler/balanced})]
+    (-> base-job
+        (add-task (core-async/input :in batch-settings))
+        (add-task (redis/writer :out redis-uri batch-settings)))))
 
-(doseq [m messages]
-  (>!! in-chan m))
-
-(close! in-chan)
-
-(defn inject-in-ch [event lifecycle]
-  {:core.async/chan in-chan})
-
-(def in-calls
-  {:lifecycle/before-task-start inject-in-ch})
-
-(def lifecycles
-  [{:lifecycle/task :in
-    :lifecycle/calls ::in-calls}
-   {:lifecycle/task :in
-    :lifecycle/calls :onyx.plugin.core-async/reader-calls}])
-
-(def catalog
-  [{:onyx/name :in
-    :onyx/plugin :onyx.plugin.core-async/input
-    :onyx/type :input
-    :onyx/medium :core.async
-    :onyx/batch-size batch-size
-    :onyx/max-peers 1
-    :onyx/doc "Reads segments via redis"}
-
-   {:onyx/name :out-redis
-    :onyx/plugin :onyx.plugin.redis/writer
-    :onyx/type :output
-    :onyx/medium :redis
-    :redis/uri redis-uri
-    :onyx/batch-size batch-size}])
-
-(def workflow
-  [[:in :out-redis]])
-
-(def v-peers (onyx.api/start-peers 2 peer-group))
-
-(def job-id
-  (:job-id
-   (onyx.api/submit-job
-    peer-config
-    {:catalog catalog
-     :workflow workflow
-     :lifecycles lifecycles
-     :task-scheduler :onyx.task-scheduler/balanced})))
-
-(onyx.api/await-job-completion peer-config job-id)
-
-(doseq [v-peer v-peers]
-  (onyx.api/shutdown-peer v-peer))
-
-(onyx.api/shutdown-peer-group peer-group)
-
-(onyx.api/shutdown-env env)
-
-(fact (sort-by :name
-               (car/wcar redis-conn
-                         (set (car/smembers "cyclists"))))
-      =>
-      [{:name "Jane" :age 25}
-       {:name "John" :age 20}])
-
-(fact (sort-by :name
-               (car/wcar redis-conn
-                         (set (car/smembers "runners"))))
-      =>
-      [{:name "Mike" :age 24}])
-
-(fact (car/wcar redis-conn (car/pfcount hll-counter))
-      =>
-      2
-      )
+(deftest redis-writer-test
+  (let [{:keys [env-config
+                peer-config
+                redis-config]} (read-config (clojure.java.io/resource "config.edn") {:profile :test})
+        redis-uri (get redis-config :redis/uri)
+        job (build-job redis-uri 10 1000)
+        {:keys [in]}(get-core-async-channels job)
+        redis-conn {:spec {:uri redis-uri}}
+        hll-counter "hll_counter"
+        messages (sample-data hll-counter)]
+    (try
+      (with-test-env [test-env [2 env-config peer-config]]
+        (pipe (spool messages) in false)
+        (onyx.test-helper/validate-enough-peers! test-env job)
+        (->> (:job-id (onyx.api/submit-job peer-config job))
+             (onyx.api/await-job-completion peer-config))
+        (is (= (sort-by :name
+                        (car/wcar redis-conn
+                                  (set (car/smembers "cyclists"))))
+               [{:name "Jane" :age 25}
+                {:name "John" :age 20}]))
+        (is (= (sort-by :name
+                        (car/wcar redis-conn
+                                  (set (car/smembers "runners"))))
+               [{:name "Mike" :age 24}]))
+        (is (= (car/wcar redis-conn (car/pfcount hll-counter))
+               2)))
+      (finally (wcar redis-conn
+                     (car/flushall)
+                     (car/flushdb))))))

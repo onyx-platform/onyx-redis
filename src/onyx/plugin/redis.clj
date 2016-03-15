@@ -1,15 +1,12 @@
 (ns onyx.plugin.redis
-  (:require [onyx.peer.pipeline-extensions :as p-ext]
-            [taoensso.carmine :as car :refer (wcar)]
-            [onyx.static.default-vals :refer [arg-or-default]]
-            [clojure.core.async :refer [<!! timeout close! go <! take! go-loop
-                                        >!! >! <!! <! chan] :as async]
-            [onyx.static.uuid :refer [random-uuid]]
-            [taoensso.timbre :refer [info]]
+  (:require [clojure.core.async :as async :refer [timeout]]
+            [onyx.peer function
+             [pipeline-extensions :as p-ext]]
+            [onyx.static
+             [default-vals :refer [arg-or-default]]
+             [uuid :refer [random-uuid]]]
             [onyx.types :as t]
-            [onyx.peer.function]
-            [taoensso.carmine.connections]))
-
+            [taoensso.carmine :as car :refer [wcar]]))
 
 (defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd])
 
@@ -19,14 +16,13 @@
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
 
-(defn inject-conn-spec [{:keys [onyx.core/params] :as event}
-                        {:keys [onyx/param? redis/uri redis/read-timeout-ms] :as lifecycle}]
-
-   (when-not uri
+(defn inject-conn-spec [{:keys [onyx.core/params onyx.core/task-map] :as event}
+                        {:keys [redis/param? redis/uri redis/read-timeout-ms] :as lifecycle}]
+  (when-not (or uri (:redis/uri task-map))
       (throw (ex-info ":redis/uri must be supplied to output task." lifecycle)))
-  (let [conn {:spec {:uri uri
+  (let [conn {:spec {:uri (or (:redis/uri task-map) uri)
                      :read-timeout-ms (or read-timeout-ms 4000)}}]
-    {:onyx.core/params (if param?
+    {:onyx.core/params (if (or (:redis/param? task-map) param?)
                          (conj params conn)
                          params)
      :redis/conn conn}))
@@ -102,78 +98,3 @@
                                    (range (- batch-size (count return))))))]
               (recur (into return vs)))
         return))))
-
-(defrecord RedisConsumer [max-pending batch-size batch-timeout conn k pending-messages drained?]
-  p-ext/Pipeline
-  p-ext/PipelineInput
-  (write-batch [this event]
-    (onyx.peer.function/write-batch event))
-
-  (read-batch [_ event]
-    (let [pending (count @pending-messages)
-          max-segments (min (- max-pending pending) batch-size)
-          batch (keep (fn [v]
-                       (cond (= v "done")
-                             (t/input (random-uuid)
-                                      :done)
-                             v
-                             (t/input (random-uuid)
-                                      {:key k
-                                       :value v})))
-                     (take-from-redis conn k batch-size batch-timeout))]
-      (if (and (all-done? (vals @pending-messages))
-               (all-done? batch)
-               (or (not (empty? @pending-messages))
-                   (not (empty? batch))))
-        (reset! drained? true)
-        ;; Allow unset to reduce the chance of draining race conditions
-        ;; I believe these are still possible in this plugin thanks to the
-        ;; sentinel handling
-        (reset! drained? false))
-      (doseq [m batch]
-        (swap! pending-messages assoc (:id m) m))
-      {:onyx.core/batch batch}))
-
-  (ack-segment
-    [_ _ segment-id]
-    (let [msg (get @pending-messages segment-id)]
-      (swap! pending-messages dissoc segment-id)))
-
-  (retry-segment
-    [_ _ segment-id]
-    (when-let [msg (get @pending-messages segment-id)]
-      (wcar conn
-            (car/lpush k (:message msg)))
-      (swap! pending-messages dissoc segment-id)))
-
-  (pending?
-    [_ _ segment-id]
-    (get @pending-messages segment-id))
-
-  (drained?
-    [_ event]
-    @drained?))
-
-(defn consumer [pipeline-data]
-  (let [catalog-entry    (:onyx.core/task-map pipeline-data)
-        max-pending      (arg-or-default :onyx/max-pending catalog-entry)
-        batch-size       (:onyx/batch-size catalog-entry)
-        batch-timeout    (arg-or-default :onyx/batch-timeout catalog-entry)
-        pending-messages (atom {})
-        drained?         (atom false)
-        read-timeout     (or (:redis/read-timeout-ms catalog-entry) 4000)
-        k (:redis/key catalog-entry)
-        uri (:redis/uri catalog-entry)
-        _ (when-not uri
-            (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
-        op (or ((:redis/op catalog-entry) operations)
-               (throw (Exception. (str "redis/op not found."))))
-        conn             {:pool nil
-                          :spec {:uri uri
-                                 :read-timeout-ms read-timeout}}]
-    (->RedisConsumer max-pending batch-size batch-timeout
-                     conn k pending-messages
-                     drained?)))
-
-(def reader-state-calls
-  {:lifecycle/before-task-start inject-pending-state})
