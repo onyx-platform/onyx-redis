@@ -80,7 +80,7 @@
 (defn take-from-redis
   "conn: Carmine map for connecting to redis
   key: The name of a redis key for looking up the relevant values
-  batch-size: The maximum size of a returned batchs
+  batch-size: The maximum size of a returned batch
   timeout: stop processing new collections after `timeout`/ms''
 
   In order to stay consistent in Redis list consumption, this function will
