@@ -18,15 +18,15 @@ new_version=$1
 version_type=$(echo "$1"|sed s/".*-"//g)
 version_base=$(echo "$1"|sed s/"-.*"//g)
 
-biggest_tag=$(git tag|tail -1)
-if [[ $biggest_tag > $version_base || $biggest_tag == $version_base && $version_type != "" ]]; then
-	echo $version_base" version base is smaller than greatest tag" $biggest_tag
-	echo "enter Y to override and release anyway."
-	read answer
-	if [[ $answer != "Y" ]]; then
-		exit 1
-	fi
-  fi
+# biggest_tag=$(git tag|tail -1)
+# if [[ $biggest_tag > $version_base || $biggest_tag == $version_base && $version_type != "" ]]; then
+# 	echo $version_base" version base is smaller than greatest tag" $biggest_tag
+# 	echo "enter Y to override and release anyway."
+# 	read answer
+# 	if [[ $answer != "Y" ]]; then
+# 		exit 1
+# 	fi
+#   fi
 
 release_branch=$2
 current_version=`lein pprint :version | sed s/\"//g`
@@ -65,9 +65,13 @@ git tag $new_plugin_version
 git push origin $new_plugin_version
 git push origin master
 
+# Clean up.
+git reset --hard HEAD
+git clean -fd
+
 # Merge artifacts into release branch.
 git checkout -b $release_branch || git checkout $release_branch
-git pull || true
+git pull origin $release_branch || true
 git merge -m "Merge branch 'master' into $release_branch" master -X theirs
 git push -u origin $release_branch
 
