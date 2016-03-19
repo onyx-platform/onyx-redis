@@ -44,6 +44,9 @@
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
    {:op :sadd :args ["cyclists" {:name "Jane" :age 25}]}
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
+   {:op :publish :args ["race-stats" {:leader "Mike"}]}
+   {:op :publish :args ["race-stats" {:leader "Jane"}]}
+   {:op :publish :args ["race-stats" {:leader "John"}]}
    {:op :pfadd :args [hll-counter 1]}
    {:op :pfadd :args [hll-counter 2]}
    :done])
@@ -54,6 +57,12 @@
   (>!! in-chan m))
 
 (close! in-chan)
+
+(def redis-subscription (atom []))
+
+(car/with-new-pubsub-listener redis-conn
+  {"race-stats" (fn f1 [msg] (swap! redis-subscription conj msg))}
+  (car/subscribe "race-stats"))
 
 (defn inject-in-ch [event lifecycle]
   {:core.async/chan in-chan})
@@ -122,4 +131,12 @@
 (fact (car/wcar redis-conn (car/pfcount hll-counter))
       =>
       2
+      )
+
+(fact (take 4 @redis-subscription)
+      =>
+      [["subscribe" "race-stats" 1]
+       ["message" "race-stats" {:leader "Mike"}]
+       ["message" "race-stats" {:leader "Jane"}]
+       ["message" "race-stats" {:leader "John"}]]
       )

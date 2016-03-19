@@ -11,10 +11,10 @@
             [taoensso.carmine.connections]))
 
 
-(defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd])
+(defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd publish])
 
 (def operations
-  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop car/pfcount car/pfadd))
+  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop car/pfcount car/pfadd car/publish))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
