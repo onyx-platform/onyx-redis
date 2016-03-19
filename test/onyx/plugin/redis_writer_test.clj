@@ -38,9 +38,20 @@
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
    {:op :sadd :args ["cyclists" {:name "Jane" :age 25}]}
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
+   {:op :publish :args ["race-stats" {:leader "Mike"}]}
+   {:op :publish :args ["race-stats" {:leader "Jane"}]}
+   {:op :publish :args ["race-stats" {:leader "John"}]}
    {:op :pfadd :args ["hll_counter" 1]}
    {:op :pfadd :args ["hll_counter" 2]}
    :done])
+
+
+(def race-stats (atom []))
+
+(defn subscribe-race-stats []
+  (car/with-new-pubsub-listener (redis-conn)
+    {"race-stats" #(swap! race-stats conj %)}
+    (car/subscribe "race-stats")))
 
 (defn count-hll-counter [redis-spec]
   (car/wcar redis-spec (car/pfcount "hll_counter")))
@@ -68,7 +79,8 @@
                 peer-config]} @config
         redis-spec (redis-conn)
         job (build-job redis-spec 10 1000)
-        {:keys [in]} (get-core-async-channels job)]
+        {:keys [in]} (get-core-async-channels job)
+        _ (subscribe-race-stats)]
     (with-test-env [test-env [2 env-config peer-config]]
       (pipe (spool sample-data) in false)
       (onyx.test-helper/validate-enough-peers! test-env job)
@@ -85,4 +97,11 @@
                  [{:name "Mike" :age 24}]))))
       (testing "redis :pfcount is the last value given"
         (is (= (count-hll-counter redis-spec)
-               2))))))
+               2)))
+      (testing "redis :publish can be consumed by subscriber"
+        (let [stats (take 4 @race-stats)]
+          (is (= stats
+                 [["subscribe" "race-stats" 1]
+                  ["message" "race-stats" {:leader "Mike"}]
+                  ["message" "race-stats" {:leader "Jane"}]
+                  ["message" "race-stats" {:leader "John"}]])))))))
