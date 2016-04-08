@@ -79,50 +79,6 @@ requests to be batched.
 
 Please see the Carmine documentation for examples for how to use Carmine.
 
-##### Consume from Key Input Plugin
-
-Consumes from a redis set or list.
-
-**NOTE** this plugin does not currently support any state recovery / check
-pointing. If a peer crashes any pending segments will be lost i.e. those that have been read
-from the set or list and are not fully acked.
-
-Catalog entry:
-
-```clojure
-
-{:onyx/name :in-from-redis
- :onyx/plugin :onyx.plugin.redis/reader
- :onyx/type :input
- :onyx/medium :redis
- :redis/uri "redis://127.0.0.1:6379"
- :redis/key ::your-key
- :redis/read-timeout-ms <<optional-timeout>>
- :redis/op :lpop
- :onyx/batch-size batch-size
- :onyx/max-peers 1
- :onyx/doc "Reads segments via redis"}
-
-```
-
-Currently supported `:redis/op` consume operations are `:lpop`, `:rpop`, and `:spop`.
-
-Lifecycle entry:
-
-```clojure
-[{:lifecycle/task :input-task
-  :lifecycle/calls :onyx.plugin.redis/reader-state-calls}]
-```
-
-###### Attributes
-
-|key                           | type                 | description
-|------------------------------|----------------------|------------
-|`:redis/uri`                  | `string`             | Redis uri
-|`:redis/key`                  |`keyword` or `string` | A Redis [list](http://redis.io/topics/data-types) or set containing segments
-|`:redis/op`                   |`keyword`             | A Redis datastructure operation (:lpop / :rpop/ :spop)
-|`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to read from Redis.
-
 #### Contributing
 
 Pull requests into the master branch are welcomed.
