@@ -10,9 +10,7 @@
                              :onyx/type :function}
                             opts)
            :lifecycles [{:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.redis/reader-conn-spec}]}
-    :schema {:task-map os/TaskMap
-             :lifecycles [os/Lifecycle]}})
+                         :lifecycle/calls :onyx.plugin.redis/reader-conn-spec}]}})
   ([task-name :- s/Keyword
     kw-fn :- s/Keyword
     uri :- s/Str
@@ -39,8 +37,7 @@
                             opts)
            :lifecycles [{:lifecycle/task task-name
                          :lifecycle/calls :onyx.plugin.redis/reader-state-calls}]}
-    :schema {:task-map RedisReaderTaskMap
-             :lifecycles [os/Lifecycle]}})
+    :schema {:task-map RedisReaderTaskMap}})
   ([task-name :- s/Keyword
     uri :- s/Str
     k :- (s/either s/Str s/Keyword)
