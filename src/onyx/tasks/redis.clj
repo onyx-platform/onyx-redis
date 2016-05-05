@@ -2,9 +2,6 @@
   (:require [onyx.schema :as os]
             [schema.core :as s]))
 
-(def UserTaskMapKey
-  (os/build-allowed-key-ns :redis))
-
 (s/defn ^:always-validate connected-task
   "Creates a redis connected task, where the first argument
    to the function located at kw-fn is a redis(carmine) connection"
@@ -13,9 +10,7 @@
                              :onyx/type :function}
                             opts)
            :lifecycles [{:lifecycle/task task-name
-                         :lifecycle/calls :onyx.plugin.redis/reader-conn-spec}]}
-    :schema {:task-map os/TaskMap
-             :lifecycles [os/Lifecycle]}})
+                         :lifecycle/calls :onyx.plugin.redis/reader-conn-spec}]}})
   ([task-name :- s/Keyword
     kw-fn :- s/Keyword
     uri :- s/Str
@@ -26,12 +21,11 @@
                                     task-opts))))
 
 (def RedisReaderTaskMap
-  (s/->Both [os/TaskMap
-             {:redis/uri s/Str
-              :redis/key (s/either s/Str s/Keyword)
-              :redis/op (s/enum :lpop :rpop :spop)
-              (s/optional-key :redis/read-timeout-ms) s/Num
-              UserTaskMapKey s/Any}]))
+  {:redis/uri s/Str
+   :redis/key (s/either s/Str s/Keyword)
+   :redis/op (s/enum :lpop :rpop :spop)
+   (s/optional-key :redis/read-timeout-ms) s/Num
+   (os/restricted-ns :redis) s/Any})
 
 (s/defn ^:always-validate reader
   ([task-name :- s/Keyword opts]
@@ -43,8 +37,7 @@
                             opts)
            :lifecycles [{:lifecycle/task task-name
                          :lifecycle/calls :onyx.plugin.redis/reader-state-calls}]}
-    :schema {:task-map RedisReaderTaskMap
-             :lifecycles [os/Lifecycle]}})
+    :schema {:task-map RedisReaderTaskMap}})
   ([task-name :- s/Keyword
     uri :- s/Str
     k :- (s/either s/Str s/Keyword)
@@ -55,10 +48,9 @@
                              :redis/op op} task-opts))))
 
 (def RedisWriterTaskMap
-  (s/->Both [os/TaskMap
-             {:redis/uri s/Str
-              (s/optional-key :redis/read-timeout-ms) s/Num
-              UserTaskMapKey s/Any}]))
+  {:redis/uri s/Str
+   (s/optional-key :redis/read-timeout-ms) s/Num
+   (os/restricted-ns :redis) s/Any})
 
 (s/defn ^:always-validate writer
   ([task-name :- s/Keyword opts]
