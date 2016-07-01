@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-redis "0.9.7.0-alpha12"
+(defproject org.onyxplatform/onyx-redis "0.9.7.0-alpha13"
   :description "Onyx plugin for redis"
   :url "https://github.com/onyx-platform/onyx-redis"
   :license {:name "Eclipse Public License"
@@ -13,7 +13,7 @@
                              :sign-releases false}}
   :dependencies [[org.clojure/clojure "1.7.0"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.9.7-alpha12"]
+                 [org.onyxplatform/onyx "0.9.7-alpha13"]
                  [com.taoensso/carmine "2.12.2" :exclusions [com.taoensso/timbre com.taoensso/encore]]
                  [aero "0.2.0"]]
   :profiles {:dev {:dependencies []
