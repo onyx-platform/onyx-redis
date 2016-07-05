@@ -1,5 +1,8 @@
 (ns onyx.plugin.redis
   (:require [clojure.core.async :as async :refer [timeout]]
+            [clojure.data.json :as json]
+            [clojure.java.io :as io]
+            [clojure.string :as string]
             [onyx.peer function
              [pipeline-extensions :as p-ext]]
             [onyx.static
@@ -8,10 +11,28 @@
             [onyx.types :as t]
             [taoensso.carmine :as car :refer [wcar]]))
 
-(defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd publish])
+;;;;;;;;;;;;;;;;;;;;
+;; Redis operations
+
+(defn redis-commands
+  "Loads the official Redis command reference. The original
+   JSON file can be found on
+   https://github.com/antirez/redis-doc/blob/master/commands.json."
+  []
+  (-> (io/resource "commands.json")
+      (slurp)
+      (json/read-str :key-fn keyword)))
 
 (def operations
-  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop car/pfcount car/pfadd car/publish))
+  (letfn [(operation-name [key]
+            (-> (name key)
+                (string/replace #" " "-")
+                (string/lower-case)))
+          (resolve-operation [op-name]
+            [(keyword op-name)
+             (resolve (symbol "taoensso.carmine" op-name))])]
+    (let [names (map operation-name (keys (redis-commands)))]
+      (into {} (map resolve-operation) names))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
