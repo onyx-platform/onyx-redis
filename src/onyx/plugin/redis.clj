@@ -44,6 +44,10 @@
           (doall
             (map (fn [{:keys [message]}]
                    (let [op ((:op message) operations)]
+                     (assert op (str "The Redis operation " (:op message)
+                                     " is currently not supported by onyx-redis."
+                                     " Supported operations are: "
+                                     (keys operations)))
                      (assert (:args message) "Redis expected format was changed to expect: {:op :operation :args [arg1, arg2, arg3]}")
                      (apply op (:args message))))
                  (mapcat :leaves (:tree results)))))
