@@ -1,5 +1,8 @@
 (ns onyx.plugin.redis
   (:require [clojure.core.async :as async :refer [timeout]]
+            [clojure.data.json :as json]
+            [clojure.java.io :as io]
+            [clojure.string :as string]
             [onyx.peer function
              [pipeline-extensions :as p-ext]]
             [onyx.static
@@ -8,10 +11,28 @@
             [onyx.types :as t]
             [taoensso.carmine :as car :refer [wcar]]))
 
-(defrecord Ops [sadd lpush zadd set lpop spop rpop pfcount pfadd publish])
+;;;;;;;;;;;;;;;;;;;;
+;; Redis operations
 
-(def operations
-  (->Ops car/sadd car/lpush car/zadd car/set car/lpop car/spop car/rpop car/pfcount car/pfadd car/publish))
+(defn redis-commands
+  "Loads the official Redis command reference. The original
+   JSON file can be found on
+   https://github.com/antirez/redis-doc/blob/master/commands.json."
+  []
+  (-> (io/resource "commands.json")
+      (slurp)
+      (json/read-str :key-fn keyword)))
+
+(defonce operations
+  (letfn [(operation-name [key]
+            (-> (name key)
+                (string/replace #" " "-")
+                (string/lower-case)))
+          (resolve-operation [op-name]
+            [(keyword op-name)
+             (resolve (symbol "taoensso.carmine" op-name))])]
+    (let [names (map operation-name (keys (redis-commands)))]
+      (into {} (map resolve-operation) names))))
 
 ;;;;;;;;;;;;;;;;;;;;
 ;; Connection lifecycle code
@@ -33,37 +54,50 @@
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Output plugin code
 
+(defn perform-operation
+  "Validates a Redis operation submitted to RedisWriter and executes it."
+  [config {:keys [message]}]
+  (let [{:keys [allowed-commands ops]} config
+        op ((:op message) (:ops config))]
+    (assert op (if-not (some #{(:op message)} allowed-commands)
+                 (str "The Redis operation " (:op message) " is not in "
+                      "the list of allowed commands set via "
+                      ":redis/allowed-commands: " allowed-commands)
+                 (str "The Redis operation " (:op message) " is not "
+                      "supported by onyx-redis / carmine. Supported "
+                      "operations are: " (keys operations))))
+    (assert (:args message)
+            (str "Redis expected format was changed to expect: "
+                 "{:op :operation :args [arg1, arg2, arg3]}"))
+    (apply op (:args message))))
 
-(defrecord RedisWriter [conn]
+(defrecord RedisWriter [conn config]
   p-ext/Pipeline
   (read-batch [_ event]
     (onyx.peer.function/read-batch event))
 
   (write-batch [_ {:keys [onyx.core/results]}]
-    (wcar conn
-          (doall
-            (map (fn [{:keys [message]}]
-                   (let [op ((:op message) operations)]
-                     (assert op (str "The Redis operation " (:op message)
-                                     " is currently not supported by onyx-redis."
-                                     " Supported operations are: "
-                                     (keys operations)))
-                     (assert (:args message) "Redis expected format was changed to expect: {:op :operation :args [arg1, arg2, arg3]}")
-                     (apply op (:args message))))
-                 (mapcat :leaves (:tree results)))))
+    (wcar conn (doall
+                 (map (partial perform-operation config)
+                      (mapcat :leaves (:tree results)))))
     {})
+
   (seal-resource [_ _]
     {}))
 
 (defn writer [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
         uri (:redis/uri catalog-entry)
+        allowed-commands (:redis/allowed-commands catalog-entry)
         _ (when-not uri
             (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
         conn          {:spec {:uri uri
                               :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
                                                    4000)}}]
-    (->RedisWriter conn)))
+    (->RedisWriter conn {:allowed-commands allowed-commands
+                         :ops (cond-> operations
+                                allowed-commands
+                                (select-keys allowed-commands))})))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Input plugin code
