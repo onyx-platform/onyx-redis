@@ -28,26 +28,28 @@ Example:
  :onyx/type :output
  :onyx/medium :redis
  :redis/uri "redis://127.0.0.1:6379"
+ :redis/allowed-commands [:set :get]
  :onyx/batch-size batch-size}
 ```
 
 ###### Attributes
 
-|key                           | type                 | description
-|------------------------------|----------------------|------------
-|`:redis/uri`                  | `string`             | Redis uri
-|`:redis/read-timeout-ms`      | `int`                | Time to wait (in ms) before giving up on trying to write to Redis.
+|key                           | type                  | description
+|------------------------------|-----------------------|------------
+|`:redis/uri`                  | `string`              | Redis uri
+|`:redis/read-timeout-ms`      | `int`                 | Time to wait (in ms) before giving up on trying to write to Redis.
+|`:redis/allowed-commands`     | `vector` of `keyword` | Optional list of Redis commands that are allowed (default: all).
 
 Segments should be supplied to the plugin in the form:
 ```clojure
 {:op :sadd :args [redis-key redis-value]}
 ```
 
-Where op is one of:
-```
-:sadd, :zadd, :lpush, :set, :pfadd
-```
-These correspond to their equivalent calls in carmine, see [documentation] (http://ptaoussanis.github.io/carmine/).
+Where op is a keyword that corresponds 1:1 to a Redis command function
+in `taoensso.carmine`, e.g. `:sadd -> taoensso.carmine/sadd`. Other
+examples are `:set`, `:del`, `:pfadd`, `:zadd`, `:lpush`. For more
+information on the commands supported by carmine, see
+[its documentation](http://ptaoussanis.github.io/carmine/).
 
 ##### Inject Connection Spec lifecycle
 
