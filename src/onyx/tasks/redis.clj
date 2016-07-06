@@ -50,6 +50,7 @@
 (def RedisWriterTaskMap
   {:redis/uri s/Str
    (s/optional-key :redis/read-timeout-ms) s/Num
+   (s/optional-key :redis/allowed-commands) [s/Keyword]
    (os/restricted-ns :redis) s/Any})
 
 (s/defn ^:always-validate writer

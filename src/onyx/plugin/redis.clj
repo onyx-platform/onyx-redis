@@ -23,7 +23,7 @@
       (slurp)
       (json/read-str :key-fn keyword)))
 
-(def operations
+(defonce operations
   (letfn [(operation-name [key]
             (-> (name key)
                 (string/replace #" " "-")
@@ -54,37 +54,50 @@
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Output plugin code
 
+(defn perform-operation
+  "Validates a Redis operation submitted to RedisWriter and executes it."
+  [config {:keys [message]}]
+  (let [{:keys [allowed-commands ops]} config
+        op ((:op message) (:ops config))]
+    (assert op (if-not (some #{(:op message)} allowed-commands)
+                 (str "The Redis operation " (:op message) " is not in "
+                      "the list of allowed commands set via "
+                      ":redis/allowed-commands: " allowed-commands)
+                 (str "The Redis operation " (:op message) " is not "
+                      "supported by onyx-redis / carmine. Supported "
+                      "operations are: " (keys operations))))
+    (assert (:args message)
+            (str "Redis expected format was changed to expect: "
+                 "{:op :operation :args [arg1, arg2, arg3]}"))
+    (apply op (:args message))))
 
-(defrecord RedisWriter [conn]
+(defrecord RedisWriter [conn config]
   p-ext/Pipeline
   (read-batch [_ event]
     (onyx.peer.function/read-batch event))
 
   (write-batch [_ {:keys [onyx.core/results]}]
-    (wcar conn
-          (doall
-            (map (fn [{:keys [message]}]
-                   (let [op ((:op message) operations)]
-                     (assert op (str "The Redis operation " (:op message)
-                                     " is currently not supported by onyx-redis."
-                                     " Supported operations are: "
-                                     (keys operations)))
-                     (assert (:args message) "Redis expected format was changed to expect: {:op :operation :args [arg1, arg2, arg3]}")
-                     (apply op (:args message))))
-                 (mapcat :leaves (:tree results)))))
+    (wcar conn (doall
+                 (map (partial perform-operation config)
+                      (mapcat :leaves (:tree results)))))
     {})
+
   (seal-resource [_ _]
     {}))
 
 (defn writer [pipeline-data]
   (let [catalog-entry (:onyx.core/task-map pipeline-data)
         uri (:redis/uri catalog-entry)
+        allowed-commands (:redis/allowed-commands catalog-entry)
         _ (when-not uri
             (throw (ex-info ":redis/uri must be supplied to output task." catalog-entry)))
         conn          {:spec {:uri uri
                               :read-timeout-ms (or (:redis/read-timeout-ms catalog-entry)
                                                    4000)}}]
-    (->RedisWriter conn)))
+    (->RedisWriter conn {:allowed-commands allowed-commands
+                         :ops (cond-> operations
+                                allowed-commands
+                                (select-keys allowed-commands))})))
 
 ;;;;;;;;;;;;;;;;;;;;;
 ;; Input plugin code
