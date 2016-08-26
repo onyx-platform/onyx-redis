@@ -28,6 +28,16 @@
              {:type :long
               :doc "Time to wait (in ms) before giving up on trying to write to Redis."}}}}
 
+   :lifecycle-entry
+   {:onyx.plugin.redis/reader
+    {:model
+     [{:task.lifecycle/name :reader-conn-spec
+       :lifecycle/calls :onyx.plugin.redis/reader-conn-spec}]}
+
+    :onyx.plugin.redis/writer
+    {:model
+     []}}
+
    :display-order
    {:onyx.plugin.redis/reader
     [:redis/uri
