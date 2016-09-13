@@ -14,7 +14,7 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [org.clojure/data.json "0.2.6"]
                  ^{:voom {:repo "git@github.com:onyx-platform/onyx.git" :branch "master"}}
-                 [org.onyxplatform/onyx "0.9.10-20160911_142440-g2f36637"]
+                 [org.onyxplatform/onyx "0.9.10-20160913_150157-g57f7df6"]
                  [com.taoensso/carmine "2.12.2" :exclusions [com.taoensso/timbre com.taoensso/encore]]
                  [aero "0.2.0"]]
   :profiles {:dev {:dependencies []
