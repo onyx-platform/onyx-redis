@@ -3,8 +3,9 @@
             [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.string :as string]
-            [onyx.peer function
-             [pipeline-extensions :as p-ext]]
+            [onyx.plugin.protocols.plugin :as p]
+            [onyx.plugin.protocols.input :as i]
+            [onyx.plugin.protocols.output :as o]
             [onyx.static
              [default-vals :refer [arg-or-default]]
              [uuid :refer [random-uuid]]]
@@ -56,7 +57,7 @@
 
 (defn perform-operation
   "Validates a Redis operation submitted to RedisWriter and executes it."
-  [config {:keys [message]}]
+  [config message]
   (let [{:keys [allowed-commands ops]} config
         op ((:op message) (:ops config))]
     (assert op (if-not (some #{(:op message)} allowed-commands)
@@ -71,22 +72,37 @@
                  "{:op :operation :args [arg1, arg2, arg3]}"))
     (apply op (:args message))))
 
+
 (defrecord RedisWriter [conn config]
-  p-ext/Pipeline
-  (read-batch [_ event]
-    (onyx.peer.function/read-batch event))
+  p/Plugin
+  (start [this event] 
+    this)
 
-  (write-batch [_ {:keys [onyx.core/results]}]
+  (stop [this event] 
+    this)
+
+  o/Output
+  (synced? [this epoch]
+    true)
+
+  (recover! [this _ _] 
+    this)
+
+  (checkpoint [this])
+
+  (prepare-batch [this event replica _]
+    true)
+
+  (checkpointed! [this epoch])
+
+  (write-batch [this {:keys [onyx.core/results]} replica _]
     (wcar conn (doall
-                 (map (partial perform-operation config)
-                      (mapcat :leaves (:tree results)))))
-    {})
+                (map (partial perform-operation config)
+                     (mapcat :leaves (:tree results)))))
+    true))
 
-  (seal-resource [_ _]
-    {}))
-
-(defn writer [pipeline-data]
-  (let [catalog-entry (:onyx.core/task-map pipeline-data)
+(defn writer [event]
+  (let [catalog-entry (:onyx.core/task-map event)
         uri (:redis/uri catalog-entry)
         allowed-commands (:redis/allowed-commands catalog-entry)
         _ (when-not uri
@@ -98,22 +114,6 @@
                          :ops (cond-> operations
                                 allowed-commands
                                 (select-keys allowed-commands))})))
-
-;;;;;;;;;;;;;;;;;;;;;
-;; Input plugin code
-
-(defn inject-pending-state [event lifecycle]
-  (let [pipeline (:onyx.core/pipeline event)
-        task     (:onyx.core/task-map event)]
-    (when (> (:onyx/max-peers task) 1)
-      (throw (Exception. "Onyx-Redis can not run with :onyx/max-peers greater than 1")))
-    {:redis/conn             (:conn pipeline)
-     :redis/drained?         (:drained? pipeline)
-     :redis/pending-messages (:pending-messages pipeline)}))
-
-(defn all-done? [messages]
-  (empty? (remove #(= :done (:message %))
-                  messages)))
 
 (defn take-from-redis
   "conn: Carmine map for connecting to redis

@@ -1,6 +1,6 @@
 (ns onyx.plugin.redis-writer-test
   (:require [aero.core :refer [read-config]]
-            [clojure.core.async :refer [pipe]]
+            [clojure.core.async :refer [pipe close! <!! >!!]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is use-fixtures testing]]
             [onyx api
@@ -32,7 +32,6 @@
 (use-fixtures :once load-config)
 (use-fixtures :each flush-redis)
 
-
 (def sample-data
   [{:op :sadd :args ["cyclists" {:name "John" :age 20}]}
    {:op :sadd :args ["runners" {:name "Mike" :age 24}]}
@@ -42,8 +41,7 @@
    {:op :publish :args ["race-stats" {:leader "Jane"}]}
    {:op :publish :args ["race-stats" {:leader "John"}]}
    {:op :pfadd :args ["hll_counter" 1]}
-   {:op :pfadd :args ["hll_counter" 2]}
-   :done])
+   {:op :pfadd :args ["hll_counter" 2]}])
 
 
 (def race-stats (atom []))
@@ -82,9 +80,11 @@
         {:keys [in]} (get-core-async-channels job)
         _ (subscribe-race-stats)]
     (with-test-env [test-env [2 env-config peer-config]]
-      (pipe (spool sample-data) in false)
+      (run! (partial >!! in) sample-data)
+      (close! in)
       (onyx.test-helper/validate-enough-peers! test-env job)
-      (->> (:job-id (onyx.api/submit-job peer-config job))
+      (->> (onyx.api/submit-job peer-config job)
+           (:job-id)
            (onyx.api/await-job-completion peer-config))
       (testing "redis :sadd and :smembers are correctly distributed"
         (let [members (fn [key] (sort-by :name

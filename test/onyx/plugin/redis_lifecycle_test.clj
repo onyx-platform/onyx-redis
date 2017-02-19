@@ -1,6 +1,6 @@
 (ns onyx.plugin.redis-lifecycle-test
   (:require [aero.core :refer [read-config]]
-            [clojure.core.async :refer [pipe]]
+            [clojure.core.async :refer [pipe close! >!!]]
             [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is]]
             [onyx api
@@ -45,16 +45,18 @@
         redis-uri (get redis-config :redis/uri)
         job (build-job redis-uri 10 1000)
         {:keys [in out]} (get-core-async-channels job)
-        redis-conn {:spec {:uri redis-uri}}]
+        redis-conn {:spec {:uri redis-uri}}
+        sample-data [{:key ::some-key}]]
     (try
       (with-test-env [test-env [3 env-config peer-config]]
-        (pipe (spool [{:key ::some-key} :done]) in false)
+        (run! (partial >!! in) sample-data)
+        (close! in)
         (ensure-redis! redis-conn)
         (onyx.test-helper/validate-enough-peers! test-env job)
-        (onyx.api/submit-job peer-config job)
-        (is (= (take-segments! out)
-               [{:results (map str (reverse (range 100)))}
-                :done])))
+        (let [{:keys [job-id]} (onyx.api/submit-job peer-config job)] 
+          (onyx.test-helper/feedback-exception! peer-config job-id)
+          (is (= (take-segments! out 50)
+                 [{:results (map str (reverse (range 100)))}]))))
       (finally (wcar redis-conn
                      (car/flushall)
                      (car/flushdb))))))
