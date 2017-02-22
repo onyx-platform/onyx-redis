@@ -3,9 +3,7 @@
             [clojure.data.json :as json]
             [clojure.java.io :as io]
             [clojure.string :as string]
-            [onyx.plugin.protocols.plugin :as p]
-            [onyx.plugin.protocols.input :as i]
-            [onyx.plugin.protocols.output :as o]
+            [onyx.plugin.protocols :as p]
             [onyx.static
              [default-vals :refer [arg-or-default]]
              [uuid :refer [random-uuid]]]
@@ -81,19 +79,24 @@
   (stop [this event] 
     this)
 
-  o/Output
+  p/BarrierSynchronization
   (synced? [this epoch]
     true)
 
+  (completed? [this]
+    true)
+
+  p/Checkpointed
   (recover! [this _ _] 
     this)
 
   (checkpoint [this])
 
+  (checkpointed! [this epoch])
+
+  p/Output
   (prepare-batch [this event replica _]
     true)
-
-  (checkpointed! [this epoch])
 
   (write-batch [this {:keys [onyx.core/results]} replica _]
     (wcar conn (doall
