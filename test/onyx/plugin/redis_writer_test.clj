@@ -1,7 +1,6 @@
 (ns onyx.plugin.redis-writer-test
   (:require [aero.core :refer [read-config]]
             [clojure.core.async :refer [pipe close! <!! >!!]]
-            [clojure.core.async.lab :refer [spool]]
             [clojure.test :refer [deftest is use-fixtures testing]]
             [onyx api
              [job :refer [add-task]]
