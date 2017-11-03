@@ -98,10 +98,10 @@
   (prepare-batch [this event replica _]
     true)
 
-  (write-batch [this {:keys [onyx.core/results]} replica _]
+  (write-batch [this {:keys [onyx.core/write-batch]} replica _]
     (wcar conn (doall
                 (map (partial perform-operation config)
-                     (mapcat :leaves (:tree results)))))
+                     write-batch)))
     true))
 
 (defn writer [event]
