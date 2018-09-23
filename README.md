@@ -7,7 +7,7 @@ Onyx plugin for redis.
 In your project file:
 
 ```clojure
-[org.onyxplatform/onyx-redis "0.13.3.0"]
+[org.onyxplatform/onyx-redis "0.13.3.1-SNAPSHOT"]
 ```
 
 In your peer boot-up namespace:
