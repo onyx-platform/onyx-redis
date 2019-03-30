@@ -1,4 +1,4 @@
-(defproject org.onyxplatform/onyx-redis "0.14.1.0"
+(defproject curbside/onyx-redis "0.14.1.1+writer"
   :description "Onyx plugin for redis"
   :url "https://github.com/onyx-platform/onyx-redis"
   :license {:name "Eclipse Public License"
