@@ -4,6 +4,7 @@
             [clojure.java.io :as io]
             [clojure.string :as string]
             [onyx.plugin.protocols :as p]
+            [taoensso.timbre :as log]
             [onyx.static
              [default-vals :refer [arg-or-default]]
              [uuid :refer [random-uuid]]]
@@ -99,9 +100,11 @@
     true)
 
   (write-batch [this {:keys [onyx.core/write-batch]} replica _]
-    (wcar conn (doall
-                (map (partial perform-operation config)
-                     write-batch)))
+    (try
+      (wcar conn (doall
+                  (map (partial perform-operation config)
+                       write-batch)))
+      (catch Exception e (log/error (str "caught exception in onyx-redis: " (.getMessage e)))))
     true))
 
 (defn writer [event]
